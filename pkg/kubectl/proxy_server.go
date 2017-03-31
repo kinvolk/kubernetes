@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"regexp"
@@ -30,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/third_party/forked/golang/httputil"
 )
 
 const (
