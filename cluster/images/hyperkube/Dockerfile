@@ -67,3 +67,6 @@ RUN ln -s /hyperkube /apiserver \
 
 # Copy the hyperkube binary
 COPY hyperkube /hyperkube
+
+# Add CAP_NET_BIND_SERVICE to hyperkube so it can bind privileged ports as non-root.
+RUN setcap cap_net_bind_service=+ep /hyperkube
