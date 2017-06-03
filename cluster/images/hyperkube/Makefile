@@ -23,6 +23,7 @@ TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 CNI_RELEASE=0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff
 CACHEBUST?=1
 QEMUVERSION=v2.7.0
+CALICO_CNI_VERSION=v1.8.0
 
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -111,8 +112,10 @@ else
 endif
 	# Download CNI
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
-	curl -sSL --retry 5 -o  ${TEMP_DIR}/cni-bin/bin/calico https://github.com/projectcalico/calico-cni/releases/download/v1.8.0/calico
+	curl -sSL --retry 5 -o  ${TEMP_DIR}/cni-bin/bin/calico https://github.com/projectcalico/calico-cni/releases/download/${CALICO_CNI_VERSION}/calico
+	curl -sSL --retry 5 -o  ${TEMP_DIR}/cni-bin/bin/calico-ipam https://github.com/projectcalico/calico-cni/releases/download/${CALICO_CNI_VERSION}/calico-ipam
 	chmod +x ${TEMP_DIR}/cni-bin/bin/calico
+	chmod +x ${TEMP_DIR}/cni-bin/bin/calico-ipam
 
 	docker build --pull -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
