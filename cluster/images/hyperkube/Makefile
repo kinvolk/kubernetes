@@ -23,7 +23,7 @@ TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 CNI_RELEASE=0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff
 CACHEBUST?=1
 QEMUVERSION=v2.7.0
-CALICO_CNI_VERSION=v1.8.0
+CALICO_CNI_VERSION=v1.8.3
 
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
