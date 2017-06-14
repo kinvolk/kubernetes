@@ -20,23 +20,28 @@
 REGISTRY?=gcr.io/google-containers
 ARCH?=amd64
 HYPERKUBE_BIN?=_output/dockerized/bin/linux/$(ARCH)/hyperkube
+CACHEBUST?=1
 
 BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.1
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
 
-build:
+build: calico
 
 ifndef VERSION
     $(error VERSION is undefined)
 endif
+
 	cp -r ./* ${TEMP_DIR}
 	cp ../../../${HYPERKUBE_BIN} ${TEMP_DIR}
 
 	chmod a+rx ${TEMP_DIR}/hyperkube
 
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+ifeq ($(CACHEBUST),1)
+	cd ${TEMP_DIR} && sed -i.back "s|CACHEBUST|$(shell uuidgen)|g" Dockerfile
+endif
 
 	docker build --pull -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
@@ -49,4 +54,9 @@ ifeq ($(ARCH),amd64)
 	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
-.PHONY: build push all
+calico:
+	mkdir -p ${TEMP_DIR}/cni-bin/bin
+	curl -sSL --retry 5 -o  ${TEMP_DIR}/cni-bin/bin/calico https://github.com/projectcalico/calico-cni/releases/download/v1.9.1/calico
+	chmod +x ${TEMP_DIR}/cni-bin/bin/calico
+
+.PHONY: build push all calico
