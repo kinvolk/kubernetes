@@ -593,6 +593,7 @@ function start_kubelet {
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
+        --enforce-node-allocatable="" \
         --cgroup-driver=${CGROUP_DRIVER} \
         --keep-terminated-pod-volumes=true \
         --eviction-hard=${EVICTION_HARD} \
