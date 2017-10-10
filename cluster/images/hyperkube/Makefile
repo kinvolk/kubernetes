@@ -23,7 +23,7 @@ HYPERKUBE_BIN?=_output/dockerized/bin/linux/$(ARCH)/hyperkube
 CALICO_RELEASE=v1.11.0
 CNI_RELEASE=v0.6.0
 
-BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.3
+BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.4
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
