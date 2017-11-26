@@ -40,6 +40,11 @@ func Register(plugins *admission.Plugins) {
 	plugins.Register("DenyExecOnPrivileged", func(config io.Reader) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(), nil
 	})
+
+	// For demo purposes, reject all "attach" requests on pods
+	plugins.Register("DenyAttach", func(config io.Reader) (admission.Interface, error) {
+		return NewDenyAttach(), nil
+	})
 }
 
 // denyExec is an implementation of admission.Interface which says no to a pod/exec on
@@ -48,7 +53,11 @@ type denyExec struct {
 	*admission.Handler
 	client internalclientset.Interface
 
+	// name of the admission controller
+	name string
+
 	// these flags control which items will be checked to deny exec/attach
+	attach     bool
 	hostIPC    bool
 	hostPID    bool
 	privileged bool
@@ -61,6 +70,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&denyExec{})
 func NewDenyEscalatingExec() admission.Interface {
 	return &denyExec{
 		Handler:    admission.NewHandler(admission.Connect),
+		name:       "DenyEscalatingExec",
 		hostIPC:    true,
 		hostPID:    true,
 		privileged: true,
@@ -73,9 +83,18 @@ func NewDenyEscalatingExec() admission.Interface {
 func NewDenyExecOnPrivileged() admission.Interface {
 	return &denyExec{
 		Handler:    admission.NewHandler(admission.Connect),
+		name:       "DenyExecOnPrivileged",
 		hostIPC:    false,
 		hostPID:    false,
 		privileged: true,
+	}
+}
+
+func NewDenyAttach() admission.Interface {
+	return &denyExec{
+		Handler: admission.NewHandler(admission.Connect),
+		name:    "DenyAttach",
+		attach:  true,
 	}
 }
 
@@ -93,16 +112,20 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, err)
 	}
 
+	if connectRequest.ResourcePath == "pods/attach" {
+		return admission.NewForbidden(a, fmt.Errorf("cannot attach to a container, rejected by %s", d.name))
+	}
+
 	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid, rejected by %s", d.name))
 	}
 
 	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc, rejected by %s", d.name))
 	}
 
 	if d.privileged && isPrivileged(pod) {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container, rejected by %s", d.name))
 	}
 
 	return nil
