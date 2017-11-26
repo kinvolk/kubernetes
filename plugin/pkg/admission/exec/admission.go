@@ -40,6 +40,11 @@ func Register(plugins *admission.Plugins) {
 	plugins.Register("DenyExecOnPrivileged", func(config io.Reader) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(), nil
 	})
+
+	// For demo purposes, reject all "attach" requests on pods
+	plugins.Register("DenyAttach", func(config io.Reader) (admission.Interface, error) {
+		return NewDenyAttach(), nil
+	})
 }
 
 // denyExec is an implementation of admission.Interface which says no to a pod/exec on
@@ -49,6 +54,7 @@ type denyExec struct {
 	client internalclientset.Interface
 
 	// these flags control which items will be checked to deny exec/attach
+	attach     bool
 	hostIPC    bool
 	hostPID    bool
 	privileged bool
@@ -79,6 +85,13 @@ func NewDenyExecOnPrivileged() admission.Interface {
 	}
 }
 
+func NewDenyAttach() admission.Interface {
+	return &denyExec{
+		Handler: admission.NewHandler(admission.Connect),
+		attach:  true,
+	}
+}
+
 func (d *denyExec) Admit(a admission.Attributes) (err error) {
 	connectRequest, ok := a.GetObject().(*rest.ConnectRequest)
 	if !ok {
@@ -91,6 +104,10 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name, metav1.GetOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, err)
+	}
+
+	if connectRequest.ResourcePath == "pods/attach" {
+		return admission.NewForbidden(a, fmt.Errorf("cannot attach to a container, rejected by admission controller"))
 	}
 
 	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
