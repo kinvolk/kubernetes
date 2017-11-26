@@ -32,6 +32,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     nfs-common \
     glusterfs-client \
     cifs-utils \
+    ceph-common \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get autoremove -y \
     && DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* # CACHEBUST
@@ -90,3 +91,6 @@ RUN ln -s /hyperkube /apiserver \
 
 # Copy the hyperkube binary
 COPY hyperkube /hyperkube
+
+# Add CAP_NET_BIND_SERVICE to hyperkube so it can bind privileged ports as non-root.
+RUN setcap cap_net_bind_service=+ep /hyperkube
