@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -109,13 +110,22 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		cache:   newRequestCache(),
 	}
 
-	if s.config.BaseURL == nil {
+	baseURLBytes, err := ioutil.ReadFile("/tmp/kubelet.BaseURL")
+	if err == nil {
+		schemeBytes, _ := ioutil.ReadFile("/tmp/kubelet.BaseURL.Scheme")
 		s.config.BaseURL = &url.URL{
-			Scheme: "http",
-			Host:   s.config.Addr,
+			Scheme: string(schemeBytes),
+			Host:   string(baseURLBytes),
 		}
-		if s.config.TLSConfig != nil {
-			s.config.BaseURL.Scheme = "https"
+	} else {
+		if s.config.BaseURL == nil {
+			s.config.BaseURL = &url.URL{
+				Scheme: "http",
+				Host:   s.config.Addr,
+			}
+			if s.config.TLSConfig != nil {
+				s.config.BaseURL.Scheme = "https"
+			}
 		}
 	}
 
