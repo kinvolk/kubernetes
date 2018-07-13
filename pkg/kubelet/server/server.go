@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -450,6 +451,12 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 
 // getContainerLogs handles containerLogs request against the Kubelet
 func (s *Server) getContainerLogs(request *restful.Request, response *restful.Response) {
+	logsURLBytes, err := ioutil.ReadFile("/tmp/kubelet.GetContainerLogsURL")
+	if err == nil {
+		http.Redirect(response.ResponseWriter, request.Request, string(logsURLBytes), http.StatusFound)
+		return
+	}
+
 	podNamespace := request.PathParameter("podNamespace")
 	podID := request.PathParameter("podID")
 	containerName := request.PathParameter("containerName")
@@ -582,6 +589,12 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 
 // getLogs handles logs requests against the Kubelet.
 func (s *Server) getLogs(request *restful.Request, response *restful.Response) {
+	logsURLBytes, err := ioutil.ReadFile("/tmp/kubelet.GetLogsURL")
+	if err == nil {
+		http.Redirect(response.ResponseWriter, request.Request, string(logsURLBytes), http.StatusFound)
+		return
+	}
+
 	s.host.ServeLogs(response, request.Request)
 }
 
