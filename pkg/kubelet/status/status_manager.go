@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -713,4 +714,71 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// getSidecarContainersName returns nil when no sidecar was found and a map with
+// the container names as keys when the annotation is found and formed correctly.
+func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
+	// TODO: duplicated logic here, move to another place later
+	// Pod can't be nil
+	dataJson, ok := pod.Annotations["alpha.kinvolk.io/sidecar"]
+	if !ok {
+		// TODO: remove
+		klog.Error("XXX: rata. getSidecarContainersName Annotation not found! :(")
+		return
+	}
+
+	var containers []string
+	if err := json.Unmarshal([]byte(dataJson), &containers); err != nil {
+		// TODO: remove XXX
+		klog.Errorf("XXX: rata. Can't decode sidecars in annotation: %v", dataJson)
+		klog.Errorf("Can't decode sidecars in annotation: %v", dataJson)
+		return
+	}
+
+	// Annotation was found and parse correctly, initialize sidecars to be
+	// non-nil from now on
+	sidecars = make(map[string]struct{})
+	for _, c := range containers {
+		sidecars[c] = struct{}{}
+	}
+
+	return
+}
+
+// Returns true iif there are sidecars, they are ready and other containers are
+// in "waiting" status. Otherwise, returns false.
+func StartNonSidecars(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		return false
+	}
+
+	sidecarsName := getSidecarContainersName(pod)
+
+	sidecarsPresent := false
+	othersWaiting := false
+	sidecarsReady := true
+
+	for _, container := range pod.Spec.Containers {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name != container.Name {
+				continue
+			}
+
+			if _, isSidecar := sidecarsName[container.Name]; isSidecar {
+				sidecarsPresent = true
+				if !status.Ready {
+					sidecarsReady = false
+				}
+
+			} else if status.State.Waiting != nil {
+				othersWaiting = true
+			}
+		}
+	}
+
+	return sidecarsPresent && sidecarsReady && othersWaiting
 }
