@@ -714,3 +714,42 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	}
 	return false
 }
+
+// Returns true iif there are sidecars, they are ready and other containers are
+// in "waiting" status. Otherwise, returns false.
+func StartNonSidecars(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		return false
+	}
+
+	ann := pod.Annotations
+
+	sidecarsPresent := false
+	othersWaiting := false
+	sidecarsReady := true
+
+	for _, container := range pod.Spec.Containers {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name != container.Name {
+				continue
+			}
+
+			// TODO: duplicated annotation here, move to another place later
+			c_ann := fmt.Sprintf("alpha.kinvolk.io/sidecar-%v", container.Name)
+			if _, isSidecar := ann[c_ann]; isSidecar {
+				sidecarsPresent = true
+				if !status.Ready {
+					sidecarsReady = false
+				}
+
+			} else if status.State.Waiting != nil {
+				othersWaiting = true
+			}
+		}
+	}
+
+	return sidecarsPresent && sidecarsReady && othersWaiting
+}

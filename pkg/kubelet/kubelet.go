@@ -2124,7 +2124,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		kl.podManager.UpdatePod(pod)
 
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
-		if status.NeedToReconcilePodReadiness(pod) {
+		if status.NeedToReconcilePodReadiness(pod) || status.StartNonSidecars(pod) {
 			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
 		}

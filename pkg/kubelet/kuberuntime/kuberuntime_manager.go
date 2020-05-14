@@ -29,6 +29,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+
+	// TODO: use proper order for includes
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -475,6 +479,167 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
+func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kubecontainer.PodStatus, changes *podActions) bool {
+	sidecars, rest := getContainersIdxByType(pod)
+
+	if len(sidecars) == 0 {
+		return false
+	}
+
+	restStarted := false
+	for idx, container := range pod.Spec.Containers {
+		if _, ok := rest[idx]; !ok {
+			continue
+		}
+
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil {
+			restStarted = true
+			break
+		}
+	}
+
+	// If the other containers are started, the regular sync should be done
+	// for all. Nothing special
+	if restStarted {
+		return false
+	}
+
+	// c&p from computePodActions() final loop, but adapted to consider only
+	// sidecar containers.
+	// This is needed only to restart sidecar containers during
+	// initialization (until they are all ready once).
+	// The call to kubecontainer.ShouldContainerBeRestarted() there, will
+	// NOT RESTART if the **container** has been started at least once and
+	// the **pod** restart policy is v1.RestartPolicyNever
+	// TODO: document this limitation. In particular, double check if it can
+	// have weird interactions with sidecars. For example, if we want the
+	// pod to not restart, but of course restart sidecar containers?
+
+	// Number of running containers to keep.
+	keepCount := 0
+	// check the status of containers.
+	for idx, container := range pod.Spec.Containers {
+		if _, ok := sidecars[idx]; !ok {
+			continue
+		}
+
+		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+
+		// Call internal container post-stop lifecycle hook for any non-running container so that any
+		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
+		// to it.
+		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
+			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
+				klog.Errorf("internal container post-stop lifecycle hook failed for container %v in pod %v with error %v",
+					container.Name, pod.Name, err)
+			}
+		}
+
+		// If container does not exist, or is not running, check whether we
+		// need to restart it.
+		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+				var message string
+				if containerStatus == nil {
+					message = fmt.Sprintf("Starting container: %v", container)
+				} else {
+					message = fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				}
+
+				klog.V(3).Infof(message)
+				changes.ContainersToStart = append(changes.ContainersToStart, idx)
+				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
+					// If container is in unknown state, we don't know whether it
+					// is actually running or not, always try killing it before
+					// restart to avoid having 2 running instances of the same container.
+					changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+						name:      containerStatus.Name,
+						container: &pod.Spec.Containers[idx],
+						message: fmt.Sprintf("Container is in %q state, try killing it before restart",
+							containerStatus.State),
+					}
+				}
+			} else if containerStatus.State != kubecontainer.ContainerStateRunning {
+				changes.ContainersToStart = append(changes.ContainersToStart, idx)
+			}
+			continue
+		}
+		// The container is running, but kill the container if any of the following condition is met.
+		var message string
+		restart := shouldRestartOnFailure(pod)
+		if _, _, changed := containerChanged(&container, containerStatus); changed {
+			message = fmt.Sprintf("Container %s definition changed", container.Name)
+			// Restart regardless of the restart policy because the container
+			// spec changed.
+			restart = true
+		} else if liveness, found := m.livenessManager.Get(containerStatus.ID); found && liveness == proberesults.Failure {
+			// If the container failed the liveness probe, we should kill it.
+			message = fmt.Sprintf("Container %s failed liveness probe", container.Name)
+		} else if startup, found := m.startupManager.Get(containerStatus.ID); found && startup == proberesults.Failure {
+			// If the container failed the startup probe, we should kill it.
+			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
+		} else {
+			// Keep the container.
+			keepCount++
+			continue
+		}
+
+		// We need to kill the container, but if we also want to restart the
+		// container afterwards, make the intent clear in the message. Also do
+		// not kill the entire pod since we expect container to be running eventually.
+		if restart {
+			message = fmt.Sprintf("%s, will be restarted", message)
+			changes.ContainersToStart = append(changes.ContainersToStart, idx)
+		}
+
+		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+			name:      containerStatus.Name,
+			container: &pod.Spec.Containers[idx],
+			message:   message,
+		}
+		klog.V(2).Infof("Container %q (%q) of pod %s: %s", container.Name, containerStatus.ID, format.Pod(pod), message)
+	}
+
+	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+		changes.KillPod = true
+		return true
+	}
+
+	if len(changes.ContainersToStart) != 0 {
+		return true
+	}
+
+	// Wait for sidecars to be ready. If they are not ready, return we need
+	// to wait. If some failed, the previous loop should catch it.
+	allReady := true
+	for idx, container := range pod.Spec.Containers {
+		if _, ok := sidecars[idx]; !ok {
+			continue
+		}
+
+		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
+		if !ok {
+			allReady = false
+			continue
+		}
+
+		if status.Ready {
+			continue
+		}
+
+		allReady = false
+	}
+
+	if !allReady {
+		return true
+	}
+
+	// We come till the end with nothing to do, return no changes need to be
+	// done
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
@@ -509,9 +674,23 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
 			return changes
 		}
-		// Start all containers by default but exclude the ones that succeeded if
-		// RestartPolicy is OnFailure.
+
+		sidecars, rest := getContainersIdxByType(pod)
+		containersToStart := sidecars
+
+		if len(sidecars) == 0 {
+			containersToStart = rest
+		}
+
 		for idx, c := range pod.Spec.Containers {
+			// start sidecars first, if any
+			// if not, start the rest
+			if _, ok := containersToStart[idx]; !ok {
+				continue
+			}
+
+			// Start all containers by default but exclude the ones that succeeded if
+			// RestartPolicy is OnFailure.
 			if containerSucceeded(&c, podStatus) && pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 				continue
 			}
@@ -557,6 +736,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		return changes
 	}
 
+	if wait := m.waitForSidecars(pod, podStatus, &changes); wait {
+		return changes
+	}
+
 	// Number of running containers to keep.
 	keepCount := 0
 	// check the status of containers.
@@ -577,7 +760,15 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
-				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				// XXX: Kinvolk submitted patch upstream to fix
+				// a simple bug here:
+				// https://github.com/kubernetes/kubernetes/pull/91469
+				var message string
+				if containerStatus == nil {
+					message = fmt.Sprintf("Starting container: %v", container)
+				} else {
+					message = fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				}
 				klog.V(3).Infof(message)
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {

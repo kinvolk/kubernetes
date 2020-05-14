@@ -36,6 +36,9 @@ import (
 	"github.com/armon/circbuf"
 	"k8s.io/klog"
 
+	// TODO: use proper order for includes
+	//podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -611,25 +614,255 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	return err
 }
 
+func getSidecarAnn(containerName string) string {
+	return fmt.Sprintf("alpha.kinvolk.io/sidecar-%v", containerName)
+}
+
+// getPodGracePeriod gets the grace period to use to run preStop hooks.
+func getPodGracePeriod(pod *v1.Pod) int64 {
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		gracePeriod = *pod.DeletionGracePeriodSeconds
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
+
+	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
+	if gracePeriod < minimumGracePeriodInSeconds {
+		gracePeriod = minimumGracePeriodInSeconds
+	}
+
+	return gracePeriod
+}
+
+func gracePeriodRemaining(pod *v1.Pod, gracePeriodOverride *int64, timeElapsed int64) *int64 {
+	// If pod is nil, just return gracePeriodOverride untouched.
+	// killContainer() will restore from labels as appropiate
+	if pod == nil {
+		return gracePeriodOverride
+	}
+
+	// TODO: check when callers might set gracePeriodOverride in
+	// killContainer(), to better understand how to handle the case where it
+	// is set to less than minimumGracePeriodInSeconds.
+	// For now, just keep it if it was set in such an aggresive fashion.
+	// Otherwise, substract the timeElapsed.
+	var newPeriod int64
+
+	if gracePeriodOverride != nil && *gracePeriodOverride < minimumGracePeriodInSeconds {
+		newPeriod = *gracePeriodOverride
+		return &newPeriod
+	}
+
+	newPeriod = getPodGracePeriod(pod) - timeElapsed
+	if gracePeriodOverride != nil {
+		newPeriod = *gracePeriodOverride - timeElapsed
+	}
+
+	// Make sure the remaining period is not less than the minimum.
+	// TODO: document this change.
+	// As if gracePeriodOverride was set and was bigger than
+	// minimumGracePeriodInSeconds, we are setting it to
+	// minimumGracePeriodInSeconds.
+	// This was not the case in killContainer. But we need to make sure it
+	// is >= 0, so... we might as well set it to minimumGracePeriodInSeconds
+	// when it is very small.
+	if newPeriod < minimumGracePeriodInSeconds {
+		newPeriod = minimumGracePeriodInSeconds
+	}
+
+	return &newPeriod
+}
+
+// TODO: add doc and switch to named return params
+func getContainersIdxByType(pod *v1.Pod) (map[int]struct{}, map[int]struct{}) {
+	sidecars := map[int]struct{}{}
+	rest := map[int]struct{}{}
+
+	//TODO: will crash if some pod is nil
+	// But can't be nil when called in computePodActions() it seems, double
+	// check
+	ann := pod.Annotations
+
+	for idx, c := range pod.Spec.Containers {
+		// check for annotation saying a container is a sidecar
+		c_ann := getSidecarAnn(c.Name)
+
+		if _, isSidecar := ann[c_ann]; isSidecar {
+			sidecars[idx] = struct{}{}
+		} else {
+			rest[idx] = struct{}{}
+		}
+	}
+
+	return sidecars, rest
+}
+
+// TODO: Add doc
+func getContainersByType(pod *v1.Pod, runningPod kubecontainer.Pod) (sidecars, rest []*kubecontainer.Container) {
+	// If pod is nil, the pod is already deleted or the kubelet was
+	// restarted during pod deletion (see doc for
+	// restoreSpecsFromContainerLabels() for more info).
+	// In that case, the functions to restore pod info do not restore
+	// annotations, so we can't get the type.
+	// Therefore, if pod is nil return all running containers as rest.
+	if pod == nil {
+		// TODO: choose logging level and improve message to add some
+		// info about the pod/containers. But is not trivial, as pod is
+		// nil.
+		klog.Errorf("Couldn't get container type for nil pod. Using all containers as non-sidecar")
+		rest = runningPod.Containers
+		return
+	}
+
+	ann := pod.Annotations
+
+	for _, c := range runningPod.Containers {
+
+		// check for annotation saying a container is a sidecar
+		c_ann := getSidecarAnn(c.Name)
+
+		if _, isSidecar := ann[c_ann]; isSidecar {
+			sidecars = append(sidecars, c)
+		} else {
+			rest = append(rest, c)
+		}
+	}
+
+	return
+}
+
+func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, runningPod kubecontainer.Pod) {
+	// If pod is nil, we can't diferentiate sidecars from non sidecars, so
+	// just return here
+	// TODO: document this limitation
+	if pod == nil {
+		return
+	}
+
+	sidecars, _ := getContainersByType(pod, runningPod)
+
+	// Even though this happen to work now with an empty slice, it's more
+	// readable if we just return
+	if len(sidecars) == 0 {
+		return
+	}
+
+	gracePeriod := getPodGracePeriod(pod)
+
+	// XXX: killContainer calls the internal preStop hook before this.
+	// Should we do that? Not sure, check later
+	// Hint: on computePodActions() mentions it is needed for:
+	//
+	// Call internal container post-stop lifecycle hook for any non-running container so that any
+	// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
+	// to it.
+	//
+	// Will need to check the function and function doc, but seems we don't
+	// need to run it here. We want to release resources when killing it
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(sidecars))
+
+	for _, container := range sidecars {
+		// Override to avoid issues with closure
+		container := container
+
+		go func() {
+			defer wg.Done()
+
+			// This is c&p from killContainer(). Doing this to make diff easier to
+			// backport instead of moving to a function.
+			containerSpec := kubecontainer.GetContainerSpec(pod, container.Name)
+			if containerSpec == nil {
+				klog.Errorf("XXX: Error running sidecar container preStop hook for pod %q, container %q", pod.Name, container.Name)
+				return
+			}
+
+			if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
+				m.executePreStopHook(pod, container.ID, containerSpec, gracePeriod)
+			}
+		}()
+	}
+	wg.Wait()
+
+	return
+}
+
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+
+	// XXX: the following case is tricky on how to handle:
+	// if gracePeriodOverride < minimumGracePeriodInSeconds, the behaviour
+	// prior to this patch is weird (maybe buggy?) of killContainer is:
+	//
+	//	* Run preStop hook ignoring gracePeriodOverride, just pod termination info
+	//	* Adjust gracePeriod by substract the time spent on the preStop hooks
+	//	* Let gracePeriod be minimumGracePeriodInSeconds, if gradePeriod < minimumGracePeriodInSeconds,
+	//	* And just after that, let gracePeriod be gracePeriodOverride, if gracePeriodOverride not nil
+	//	  IOW, if gracePeriodOverride is used, it overrides no matter
+	//	  what
+	//	* Kill the container using gracePeriod
+	//
+	// Therefore, what we propose to do here is:
+	//	* If pod is nil, we can't restore sidecars info (can't get it
+	//	from labels) so behavior is the same as without this patch
+	//	* Otherwise,
+	//	* Calculate time it takes to run m.runSidecarsPreStopHooks()
+	//	* Substract that time using gracePeriodRemaining(), let it be
+	//	gracePeriod
+	//	* Call killContainer() using this new gracePeriod as override.
+	//
+	// 	However, this will cause to always call killContainer() with
+	// 	gracePeriodOverride
+
+	// TODO: check that it is very close to zero if no preStop hook is used.
+	// Or, better yet, change the function to return the *elapsed* time when
+	// running the preStop hooks.
+
+	preStopStart := time.Now()
+	m.runSidecarsPreStopHooks(pod, runningPod)
+	preStopElapsed := int64(time.Since(preStopStart).Seconds())
+
+	gracePeriod := gracePeriodRemaining(pod, gracePeriodOverride, preStopElapsed)
+
+	// Now that preStop was called, kill first non-sidecars and then
+	// sidecars
+	sidecars, rest := getContainersByType(pod, runningPod)
+	containersOrder := [][]*kubecontainer.Container{rest, sidecars}
+
 	wg := sync.WaitGroup{}
 
-	wg.Add(len(runningPod.Containers))
-	for _, container := range runningPod.Containers {
-		go func(container *kubecontainer.Container) {
-			defer utilruntime.HandleCrash()
-			defer wg.Done()
+	// TODO: By killing the sidecars with m.killContainer() after just
+	// calling the preStopHooks some lines above, this guarantees preStop
+	// hooks  are called two times. This code is simpler, but we can try
+	// harder to deliver it only once if we want.
+	for _, containers := range containersOrder {
+		wg.Add(len(containers))
 
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-			}
-			containerResults <- killContainerResult
-		}(container)
+		killStart := time.Now()
+
+		for _, container := range containers {
+			go func(container *kubecontainer.Container) {
+				defer utilruntime.HandleCrash()
+				defer wg.Done()
+
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
+				if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriod); err != nil {
+					killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+				}
+				containerResults <- killContainerResult
+			}(container)
+		}
+
+		wg.Wait()
+
+		killElapsed := int64(time.Since(killStart).Seconds())
+		gracePeriod = gracePeriodRemaining(pod, gracePeriod, killElapsed)
 	}
-	wg.Wait()
+
 	close(containerResults)
 
 	for containerResult := range containerResults {
