@@ -32,6 +32,7 @@ const (
 	// TODO: change those label names to follow kubernetes's format
 	podDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
 	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
+	podAlphaKinvolkSidecarsLabel   = "io.kubernetes.pod.alpha.kinvolk.sidecars"
 
 	containerHashLabel                     = "io.kubernetes.container.hash"
 	containerRestartCountLabel             = "io.kubernetes.container.restartCount"
@@ -70,6 +71,7 @@ type annotatedContainerInfo struct {
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
 	PreStopHandler            *v1.Handler
 	ContainerPorts            []v1.ContainerPort
+	AlphaKinvolkSidecars      string
 }
 
 // newPodLabels creates pod labels from v1.Pod.
@@ -123,6 +125,10 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	}
 	if pod.Spec.TerminationGracePeriodSeconds != nil {
 		annotations[podTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
+	}
+
+	if val, ok := pod.Annotations[kinvolkSidecarAnn]; ok {
+		annotations[podAlphaKinvolkSidecarsLabel] = val
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
@@ -189,6 +195,9 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	containerInfo := &annotatedContainerInfo{
 		TerminationMessagePath:   getStringValueFromLabel(annotations, containerTerminationMessagePathLabel),
 		TerminationMessagePolicy: v1.TerminationMessagePolicy(getStringValueFromLabel(annotations, containerTerminationMessagePolicyLabel)),
+		// Use getStringValueFromLabelNoLog as the field is expected to
+		// not be present often, so we don't spam the logs
+		AlphaKinvolkSidecars: getStringValueFromLabelNoLog(annotations, podAlphaKinvolkSidecarsLabel),
 	}
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
@@ -219,6 +228,14 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	}
 
 	return containerInfo
+}
+
+func getStringValueFromLabelNoLog(labels map[string]string, label string) string {
+	if value, found := labels[label]; found {
+		return value
+	}
+	// Return empty string "" for these containers, the caller will get value by other ways.
+	return ""
 }
 
 func getStringValueFromLabel(labels map[string]string, label string) string {
