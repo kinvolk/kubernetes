@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -713,4 +714,79 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// getSidecarContainersName returns nil when no sidecar was found and a map with
+// the container names as keys when the annotation is found and formed correctly.
+func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
+	// TODO: duplicated logic here, move to another place later
+	// Pod can't be nil
+	dataJson, ok := pod.Annotations["alpha.kinvolk.io/sidecar"]
+	if !ok {
+		klog.V(5).Infof("Pod: %q does not have a sidecar annotation", pod.Name)
+		return
+	}
+
+	var containers []string
+	if err := json.Unmarshal([]byte(dataJson), &containers); err != nil {
+		klog.Errorf("Can't decode sidecars for pod: %q. Got invalid annotation: %v", pod.Name, dataJson)
+		return
+	}
+
+	// Annotation was found and parse correctly, initialize sidecars to be
+	// non-nil from now on
+	sidecars = make(map[string]struct{})
+	for _, c := range containers {
+		sidecars[c] = struct{}{}
+	}
+
+	return
+}
+
+// Returns true iif there are sidecars, they are ready and other containers are
+// in "waiting" status. Otherwise, returns false.
+func StartNonSidecars(pod *v1.Pod) bool {
+	if pod == nil {
+		klog.V(5).Info("Pod is nil, do not start non-sidecars")
+		return false
+	}
+	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		klog.V(5).Info("Either pod.Spec.Containers or pod.Status.ContainerStatuses is nil, do not start non-sidecars")
+		return false
+	}
+
+	sidecarsName := getSidecarContainersName(pod)
+
+	sidecarsPresent := false
+	othersWaiting := false
+	sidecarsReady := true
+
+	for _, container := range pod.Spec.Containers {
+		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
+		if !ok {
+			klog.V(5).Infof("Couldn't get status for container: %q, pod: %q", container.Name, pod.Name)
+			continue
+		}
+
+		if _, isSidecar := sidecarsName[container.Name]; isSidecar {
+			sidecarsPresent = true
+			if !status.Ready {
+				klog.V(5).Infof("Sidecar container not ready: %q, pod: %q", container.Name, pod.Name)
+				sidecarsReady = false
+			}
+
+		} else if status.State.Waiting != nil {
+			othersWaiting = true
+		}
+	}
+
+	ret := sidecarsPresent && sidecarsReady && othersWaiting
+
+	if ret {
+		klog.V(5).Infof("Starting non-sidecars containers for pod: %q", pod.Name)
+	} else {
+		klog.V(5).Infof("Not starting non-sidecars containers for pod: %q", pod.Name)
+	}
+
+	return ret
 }

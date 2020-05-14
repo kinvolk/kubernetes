@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -543,6 +544,12 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 			PreStop: a.PreStopHandler,
 		}
 	}
+
+	if a.AlphaKinvolkSidecars != "" {
+		pod.Annotations = map[string]string{kinvolkSidecarAnn: a.AlphaKinvolkSidecars}
+		klog.V(4).Infof("Restoring pod with ann: %v", pod.Annotations)
+	}
+
 	return pod, container, nil
 }
 
@@ -611,25 +618,287 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	return err
 }
 
+// getPodGracePeriod gets the grace period to use to run preStop hooks.
+func getPodGracePeriod(pod *v1.Pod) int64 {
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		gracePeriod = *pod.DeletionGracePeriodSeconds
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
+
+	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
+	if gracePeriod < minimumGracePeriodInSeconds {
+		gracePeriod = minimumGracePeriodInSeconds
+	}
+
+	return gracePeriod
+}
+
+func gracePeriodRemaining(pod *v1.Pod, gracePeriodOverride *int64, timeElapsed int64) *int64 {
+	// If pod is nil, just return gracePeriodOverride untouched.
+	// killContainer() will restore from labels as appropiate
+	if pod == nil {
+		return gracePeriodOverride
+	}
+
+	var newPeriod int64
+
+	if gracePeriodOverride != nil && *gracePeriodOverride < minimumGracePeriodInSeconds {
+		newPeriod = *gracePeriodOverride
+		return &newPeriod
+	}
+
+	newPeriod = getPodGracePeriod(pod) - timeElapsed
+	if gracePeriodOverride != nil {
+		newPeriod = *gracePeriodOverride - timeElapsed
+	}
+
+	// Make sure the remaining period is not less than the minimum.
+	// TODO: document this change.
+	if newPeriod < minimumGracePeriodInSeconds {
+		newPeriod = minimumGracePeriodInSeconds
+	}
+
+	return &newPeriod
+}
+
+// getSidecarContainersName returns nil when no sidecar was found and a map with
+// the container names as keys when the annotation is found and formed correctly.
+func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
+	// Pod can't be nil
+	dataJson, ok := pod.Annotations[kinvolkSidecarAnn]
+	if !ok {
+		klog.V(5).Infof("Pod: %q does not have a sidecar annotation", pod.Name)
+		return
+	}
+
+	var containers []string
+	if err := json.Unmarshal([]byte(dataJson), &containers); err != nil {
+		klog.Errorf("Can't decode sidecars for pod: %q. Got invalid annotation: %v", pod.Name, dataJson)
+		return
+	}
+
+	// Annotation was found and parse correctly, initialize sidecars to be
+	// non-nil from now on
+	sidecars = make(map[string]struct{})
+	for _, c := range containers {
+		sidecars[c] = struct{}{}
+	}
+
+	return
+}
+
+// getContainersIdxByType returns a slice of index of the sidecar containers and
+// another slice with the index of the non-sidecar containers.
+// Assumes the pod is not nil.
+func getContainersIdxByType(pod *v1.Pod) (sidecars, rest map[int]struct{}) {
+	sidecars = map[int]struct{}{}
+	rest = map[int]struct{}{}
+
+	sidecarsName := getSidecarContainersName(pod)
+
+	for idx, c := range pod.Spec.Containers {
+		if _, isSidecar := sidecarsName[c.Name]; isSidecar {
+			sidecars[idx] = struct{}{}
+		} else {
+			rest[idx] = struct{}{}
+		}
+	}
+
+	return
+}
+
+// getContainersByType returns a slice of sidecar and non-sidecar containers in
+// the given pod. If pod is nil, it just returns all as non-sidecars.
+func getContainersByType(pod *v1.Pod, runningPod kubecontainer.Pod) (sidecars, rest []*kubecontainer.Container) {
+	// If pod is nil return all running containers as rest.
+	if pod == nil {
+		rest = runningPod.Containers
+		return
+	}
+
+	sidecarsName := getSidecarContainersName(pod)
+
+	for _, c := range runningPod.Containers {
+		if _, isSidecar := sidecarsName[c.Name]; isSidecar {
+			sidecars = append(sidecars, c)
+		} else {
+			rest = append(rest, c)
+		}
+	}
+
+	return
+}
+
+// getOrRestorePodSpecsForKilling if the pod is nil and no errrors are found,
+// returns a pod that has all the fields needed for killing a pod. The pod
+// fields WILL be incomplete if the pod param is nil, as it will only contain
+// the fields needed for gracefully killing a pod. The user must not use fields
+// not completed by this function.
+// If the pod param is not nil, it returns the same pod.
+func (m *kubeGenericRuntimeManager) getOrRestorePodSpecForKilling(pod *v1.Pod, runningPod kubecontainer.Pod) (*v1.Pod, error) {
+	if pod != nil {
+		return pod, nil
+	}
+
+	if len(runningPod.Containers) == 0 {
+		return nil, errors.New("No container running, can't restore info")
+	}
+
+	for _, container := range runningPod.Containers {
+		restoredPod, spec, err := m.restoreSpecsFromContainerLabels(container.ID)
+
+		// If no err is reported, restoredPod and spec can't be nil
+		if err != nil {
+			return nil, err
+		}
+
+		if pod == nil {
+			pod = restoredPod
+		}
+
+		pod.Spec.Containers = append(pod.Spec.Containers, *spec)
+	}
+
+	return pod, nil
+}
+
+// runSidecarsPreStopHooks runs the preStop hooks for sidecar containers. If
+// the pod is nil or there are no running containers, it just returns without
+// running anything.
+func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, runningPod kubecontainer.Pod) {
+	if pod == nil || len(runningPod.Containers) == 0 {
+		klog.V(4).Info("Not running sidecars PreStop hooks. Either the pod is nil pod or there are no running containers")
+		return
+	}
+
+	sidecars, _ := getContainersByType(pod, runningPod)
+
+	// Even though this happen to work now with an empty slice, it's more
+	// readable if we just return.
+	if len(sidecars) == 0 {
+		klog.V(5).Infof("Not running sidecars PreStop hooks for pod %q. No sidecar containers found", pod.Name)
+		return
+	}
+	klog.V(5).Infof("Running Sidecars PreStop hooks for pod: %q, containers: %q", pod.Name, runningContainersName(sidecars))
+
+	gracePeriod := getPodGracePeriod(pod)
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(sidecars))
+
+	for _, container := range sidecars {
+		// Override to avoid issues with closure.
+		container := container
+
+		go func() {
+			defer wg.Done()
+
+			// This is c&p from killContainer(). Doing this to make diff easier to
+			// backport instead of moving to a function.
+			containerSpec := kubecontainer.GetContainerSpec(pod, container.Name)
+			if containerSpec == nil {
+				klog.Errorf("Error running sidecar container preStop hook for pod %q, container %q", pod.Name, container.Name)
+				return
+			}
+
+			if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
+				m.executePreStopHook(pod, container.ID, containerSpec, gracePeriod)
+			}
+		}()
+	}
+	wg.Wait()
+
+	return
+}
+
+func runningContainersName(runningContainers []*kubecontainer.Container) []string {
+	var ret []string
+
+	for _, c := range runningContainers {
+		ret = append(ret, c.Name)
+	}
+
+	return ret
+}
+
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+
+	if len(runningPod.Containers) == 0 {
+		klog.V(4).Info("There are no running containers. Not killing anything")
+		return
+	}
+
+	if pod == nil {
+		// If the pod is nil, we restore from labels just exactly the
+		// fields needed to kill the container.
+		// Note that the pod is incomplete (doesn't have all field
+		// populated) and only restored fields should be used.
+		klog.V(5).Info("Pod is nil, trying to restore it from annotations")
+		if restoredPod, err := m.getOrRestorePodSpecForKilling(pod, runningPod); err != nil {
+			klog.Errorf("Pod is nil and couldn't restore it from labels: %v. Using all containers as non-sidecar: %q", err, runningContainersName(runningPod.Containers))
+		} else {
+			pod = restoredPod
+			klog.V(5).Infof("Pod restored from annotations: %q", pod.Name)
+		}
+	}
+
+	preStopStart := time.Now()
+	m.runSidecarsPreStopHooks(pod, runningPod)
+	preStopElapsed := int64(time.Since(preStopStart).Seconds())
+
+	if pod != nil {
+		klog.V(5).Infof("Time elapsed (in seconds) on PreStop hooks: %v, pod: %v", preStopElapsed, pod.Name)
+	}
+
+	gracePeriod := gracePeriodRemaining(pod, gracePeriodOverride, preStopElapsed)
+	if gracePeriod != nil && pod != nil {
+		klog.V(5).Infof("Remaining grace period seconds: %v, pod: %v", *gracePeriod, pod.Name)
+	}
+
+	// Now that preStop was called, kill first non-sidecars and then
+	// sidecars
+	sidecars, rest := getContainersByType(pod, runningPod)
+	containersOrder := [][]*kubecontainer.Container{rest, sidecars}
+
+	if pod != nil {
+		klog.V(5).Infof("Killing pod: %q. Sidecar containers: %q, non-sidecars: %q", pod.Name, runningContainersName(sidecars), runningContainersName(rest))
+	}
+
 	wg := sync.WaitGroup{}
 
-	wg.Add(len(runningPod.Containers))
-	for _, container := range runningPod.Containers {
-		go func(container *kubecontainer.Container) {
-			defer utilruntime.HandleCrash()
-			defer wg.Done()
+	// XXX: By killing the sidecars with m.killContainer() after just
+	// calling the preStopHooks some lines above, guarantees preStop hooks
+	// are called two times. This code is simpler, but we can try harder to
+	// deliver it only once if we want.
+	for _, containers := range containersOrder {
+		wg.Add(len(containers))
 
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-			}
-			containerResults <- killContainerResult
-		}(container)
+		killStart := time.Now()
+
+		for _, container := range containers {
+			go func(container *kubecontainer.Container) {
+				defer utilruntime.HandleCrash()
+				defer wg.Done()
+
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
+				if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriod); err != nil {
+					killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+				}
+				containerResults <- killContainerResult
+			}(container)
+		}
+
+		wg.Wait()
+
+		killElapsed := int64(time.Since(killStart).Seconds())
+		gracePeriod = gracePeriodRemaining(pod, gracePeriod, killElapsed)
 	}
-	wg.Wait()
+
 	close(containerResults)
 
 	for containerResult := range containerResults {
