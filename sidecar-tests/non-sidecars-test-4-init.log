@@ -1,0 +1,59 @@
+Thu Jun 11 16:33:44 UTC 2020 init-1 3132877d3615 Initialization done
+Thu Jun 11 16:33:48 UTC 2020 init-2 759cb14b64b8 Initialization done
+Thu Jun 11 16:33:52 UTC 2020 debian-3 60256a9646f1 Starting
+Thu Jun 11 16:33:56 UTC 2020 debian-4 37bd66fe5743 Starting
+Thu Jun 11 16:34:00 UTC 2020 debian-1 153a8c4de40a Starting
+Thu Jun 11 16:34:04 UTC 2020 debian-2 7461ad963e78 Starting
+Thu Jun 11 16:34:04 UTC 2020 debian-4 37bd66fe5743 Not Ready
+Thu Jun 11 16:34:05 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:05 UTC 2020 debian-4 37bd66fe5743 Not Ready
+Thu Jun 11 16:34:06 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:06 UTC 2020 debian-4 37bd66fe5743 Not Ready
+Thu Jun 11 16:34:07 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:07 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:08 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:08 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:09 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:09 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:10 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:10 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:11 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:11 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:12 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:12 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:13 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:13 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:14 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:14 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:15 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:15 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:16 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:16 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:17 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:17 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:18 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:18 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:19 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:19 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:20 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:20 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:21 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:21 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:22 UTC 2020 debian-2 7461ad963e78 PreStop Will-Sleep
+Thu Jun 11 16:34:22 UTC 2020 debian-3 60256a9646f1 PreStop Will-Sleep
+Thu Jun 11 16:34:22 UTC 2020 debian-1 153a8c4de40a PreStop Will-Sleep
+Thu Jun 11 16:34:22 UTC 2020 debian-4 37bd66fe5743 PreStop Will-Sleep
+Thu Jun 11 16:34:22 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:22 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:23 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:23 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:34:24 UTC 2020 debian-3 60256a9646f1 PreStop-After-Sleep
+Thu Jun 11 16:34:24 UTC 2020 debian-2 7461ad963e78 PreStop-After-Sleep
+Thu Jun 11 16:34:24 UTC 2020 debian-1 153a8c4de40a PreStop-After-Sleep
+Thu Jun 11 16:34:24 UTC 2020 debian-4 37bd66fe5743 PreStop-After-Sleep
+Thu Jun 11 16:34:24 UTC 2020 debian-3 60256a9646f1 Ready
+Thu Jun 11 16:34:00 UTC 2020 debian-1 153a8c4de40a Received SIGTERM
+Thu Jun 11 16:34:24 UTC 2020 debian-4 37bd66fe5743 Ready
+Thu Jun 11 16:33:56 UTC 2020 debian-4 37bd66fe5743 Received SIGTERM
+Thu Jun 11 16:33:52 UTC 2020 debian-3 60256a9646f1 Received SIGTERM
+Thu Jun 11 16:34:04 UTC 2020 debian-2 7461ad963e78 Received SIGTERM
