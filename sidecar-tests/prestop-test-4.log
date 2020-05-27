@@ -1,0 +1,85 @@
+Thu Jun 11 17:27:30 UTC 2020 sidecar-1 12b4b371c519 Starting
+Thu Jun 11 17:27:34 UTC 2020 sidecar-2 575a65b25717 Starting
+Thu Jun 11 17:27:35 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:35 UTC 2020 sidecar-1 12b4b371c519 Not Ready
+Thu Jun 11 17:27:36 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:36 UTC 2020 sidecar-1 12b4b371c519 Not Ready
+Thu Jun 11 17:27:37 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:37 UTC 2020 sidecar-1 12b4b371c519 Not Ready
+Thu Jun 11 17:27:38 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:38 UTC 2020 sidecar-1 12b4b371c519 Not Ready
+Thu Jun 11 17:27:39 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:39 UTC 2020 sidecar-1 12b4b371c519 Not Ready
+Thu Jun 11 17:27:40 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:40 UTC 2020 sidecar-1 12b4b371c519 Not Ready
+Thu Jun 11 17:27:41 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:41 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:41 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:42 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:42 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:43 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:43 UTC 2020 sidecar-2 575a65b25717 Not Ready
+Thu Jun 11 17:27:44 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:45 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:45 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:46 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:46 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:46 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:47 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:48 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:48 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:48 UTC 2020 debian-1 4c562ced91de Starting
+Thu Jun 11 17:27:49 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:49 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:50 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:50 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:51 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:51 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:52 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:52 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:52 UTC 2020 debian-2 9504af93fd4c Starting
+Thu Jun 11 17:27:53 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:53 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:54 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:54 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:55 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:55 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:56 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:56 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:57 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:57 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:58 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:58 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:58 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:59 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:59 UTC 2020 sidecar-2 575a65b25717 PreStop Will-Sleep
+Thu Jun 11 17:27:59 UTC 2020 sidecar-1 12b4b371c519 PreStop Will-Sleep
+Thu Jun 11 17:27:59 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:00 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:28:01 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:01 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:28:01 UTC 2020 sidecar-1 12b4b371c519 PreStop-After-Sleep
+Thu Jun 11 17:28:01 UTC 2020 sidecar-2 575a65b25717 PreStop-After-Sleep
+Thu Jun 11 17:28:01 UTC 2020 debian-1 4c562ced91de PreStop Will-Sleep
+Thu Jun 11 17:28:01 UTC 2020 debian-2 9504af93fd4c PreStop Will-Sleep
+Thu Jun 11 17:28:02 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:02 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:28:03 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:03 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:28:03 UTC 2020 debian-2 9504af93fd4c PreStop-After-Sleep
+Thu Jun 11 17:28:03 UTC 2020 debian-1 4c562ced91de PreStop-After-Sleep
+Thu Jun 11 17:27:48 UTC 2020 debian-1 4c562ced91de Received SIGTERM
+Thu Jun 11 17:28:03 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:04 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:27:52 UTC 2020 debian-2 9504af93fd4c Received SIGTERM
+Thu Jun 11 17:28:04 UTC 2020 sidecar-2 575a65b25717 PreStop Will-Sleep
+Thu Jun 11 17:28:04 UTC 2020 sidecar-1 12b4b371c519 PreStop Will-Sleep
+Thu Jun 11 17:28:05 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:05 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:28:06 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:28:06 UTC 2020 sidecar-1 12b4b371c519 Ready
+Thu Jun 11 17:28:06 UTC 2020 sidecar-2 575a65b25717 PreStop-After-Sleep
+Thu Jun 11 17:28:06 UTC 2020 sidecar-1 12b4b371c519 PreStop-After-Sleep
+Thu Jun 11 17:27:30 UTC 2020 sidecar-1 12b4b371c519 Received SIGTERM
+Thu Jun 11 17:28:07 UTC 2020 sidecar-2 575a65b25717 Ready
+Thu Jun 11 17:27:34 UTC 2020 sidecar-2 575a65b25717 Received SIGTERM
