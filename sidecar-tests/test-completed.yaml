@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: completion
+  annotations:
+    alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
+  name: completion
+  namespace: default
+spec:
+      # Make this pod just run until containers exit
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: sidecar-1
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "sidecar-1"
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready || /logs/logs.sh Not Ready"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: debian-1
+        image: debian
+        command: ["/bin/sh", "-c", "/logs/logs.sh Starting and doing stuff; sleep 10; /logs/logs.sh Finished; exit 0"]
+        env:
+          - name: NAME
+            value: "debian-1"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      volumes:
+      - name: logs
+        hostPath:
+          path: /tmp/logs/

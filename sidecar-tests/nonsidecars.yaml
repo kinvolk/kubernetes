@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: nonsidecars
+  name: nonsidecars
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      run: nonsidecars
+  template:
+    metadata:
+      annotations:
+      labels:
+        run: nonsidecars
+    spec:
+      containers:
+      - name: debian-2
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "debian-2"
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready || /logs/logs.sh Not Ready"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: debian-1
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "debian-1"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      volumes:
+      - name: logs
+        hostPath:
+          path: /tmp/logs/
