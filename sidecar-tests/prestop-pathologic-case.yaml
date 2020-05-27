@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: prestop
+  name: prestop
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      run: prestop
+  template:
+    metadata:
+      annotations:
+        alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
+        alpha.kinvolk.io/sidecar-sidecar-2: "dummy"
+      labels:
+        run: prestop
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: sidecar-1
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "sidecar-1"
+        livenessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "/logs/logs.sh Failing livenessProbe; exit 1"]
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "/logs/logs.sh Failing readinessProbe; exit 1"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: sidecar-2
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "sidecar-2"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: debian-1
+        command: ["/logs/logs.sh", "sleep"]
+        image: debian
+        env:
+          - name: NAME
+            value: "debian-1"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: debian-2
+        command: ["/logs/logs.sh", "sleep"]
+        image: debian
+        env:
+          - name: NAME
+            value: "debian-2"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      volumes:
+      - name: logs
+        hostPath:
+          path: /tmp/logs/

@@ -1,0 +1,30 @@
+Fri May 29 13:36:59 UTC 2020 sidecar-1 c96a3dbf5179 Starting
+Fri May 29 13:37:01 UTC 2020 sidecar-1 c96a3dbf5179 Not Ready
+Fri May 29 13:37:02 UTC 2020 sidecar-1 c96a3dbf5179 Not Ready
+Fri May 29 13:37:02 UTC 2020 sidecar-1 c96a3dbf5179 Not Ready
+Fri May 29 13:37:04 UTC 2020 sidecar-1 c96a3dbf5179 Not Ready
+Fri May 29 13:37:04 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:05 UTC 2020 debian-1 080d42643394 Starting
+Fri May 29 13:37:06 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:07 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:07 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:09 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:09 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:11 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:12 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:13 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:13 UTC 2020 sidecar-1 c96a3dbf5179 PreStop Will-Sleep
+Fri May 29 13:37:14 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:14 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:15 UTC 2020 sidecar-1 c96a3dbf5179 PreStop-After-Sleep
+Fri May 29 13:37:15 UTC 2020 debian-1 080d42643394 PreStop Will-Sleep
+Fri May 29 13:37:15 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:16 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:17 UTC 2020 debian-1 080d42643394 PreStop-After-Sleep
+Fri May 29 13:37:05 UTC 2020 debian-1 080d42643394 Received SIGTERM
+Fri May 29 13:37:17 UTC 2020 sidecar-1 c96a3dbf5179 PreStop Will-Sleep
+Fri May 29 13:37:17 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:18 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:37:19 UTC 2020 sidecar-1 c96a3dbf5179 PreStop-After-Sleep
+Fri May 29 13:37:20 UTC 2020 sidecar-1 c96a3dbf5179 Ready
+Fri May 29 13:36:59 UTC 2020 sidecar-1 c96a3dbf5179 Received SIGTERM

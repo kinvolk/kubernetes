@@ -1,0 +1,30 @@
+Sat May 30 13:00:14 UTC 2020 sidecar-1 543ccc7e82b9 Starting
+Sat May 30 13:00:18 UTC 2020 sidecar-2 b68b488e5231 Starting
+Sat May 30 13:00:19 UTC 2020 sidecar-1 543ccc7e82b9 Failing readinessProbe
+Sat May 30 13:00:19 UTC 2020 sidecar-1 543ccc7e82b9 Failing livenessProbe
+Sat May 30 13:00:19 UTC 2020 sidecar-1 543ccc7e82b9 PreStop Will-Sleep
+Sat May 30 13:00:20 UTC 2020 sidecar-1 543ccc7e82b9 Failing readinessProbe
+Sat May 30 13:00:21 UTC 2020 sidecar-1 543ccc7e82b9 Failing readinessProbe
+Sat May 30 13:00:21 UTC 2020 sidecar-1 543ccc7e82b9 PreStop-After-Sleep
+Sat May 30 13:00:22 UTC 2020 sidecar-1 543ccc7e82b9 Failing readinessProbe
+Sat May 30 13:00:14 UTC 2020 sidecar-1 543ccc7e82b9 Received SIGTERM
+Sat May 30 13:00:26 UTC 2020 sidecar-1 a1586bed7143 Starting
+Sat May 30 13:00:27 UTC 2020 sidecar-1 a1586bed7143 Failing readinessProbe
+Sat May 30 13:00:27 UTC 2020 sidecar-1 a1586bed7143 Failing livenessProbe
+Sat May 30 13:00:27 UTC 2020 sidecar-1 a1586bed7143 PreStop Will-Sleep
+Sat May 30 13:00:28 UTC 2020 sidecar-1 a1586bed7143 Failing readinessProbe
+Sat May 30 13:00:29 UTC 2020 sidecar-1 a1586bed7143 Failing readinessProbe
+Sat May 30 13:00:29 UTC 2020 sidecar-1 a1586bed7143 PreStop-After-Sleep
+Sat May 30 13:00:30 UTC 2020 sidecar-1 a1586bed7143 Failing readinessProbe
+Sat May 30 13:00:31 UTC 2020 sidecar-1 a1586bed7143 Failing readinessProbe
+Sat May 30 13:00:26 UTC 2020 sidecar-1 a1586bed7143 Received SIGTERM
+Sat May 30 13:00:35 UTC 2020 sidecar-1 6a90c97e8b14 Starting
+Sat May 30 13:00:36 UTC 2020 sidecar-1 6a90c97e8b14 Failing readinessProbe
+Sat May 30 13:00:36 UTC 2020 sidecar-1 6a90c97e8b14 Failing livenessProbe
+Sat May 30 13:00:36 UTC 2020 sidecar-1 6a90c97e8b14 PreStop Will-Sleep
+Sat May 30 13:00:37 UTC 2020 sidecar-1 6a90c97e8b14 Failing readinessProbe
+Sat May 30 13:00:38 UTC 2020 sidecar-1 6a90c97e8b14 Failing readinessProbe
+Sat May 30 13:00:38 UTC 2020 sidecar-1 6a90c97e8b14 PreStop-After-Sleep
+Sat May 30 13:00:39 UTC 2020 sidecar-1 6a90c97e8b14 Failing readinessProbe
+Sat May 30 13:00:40 UTC 2020 sidecar-1 6a90c97e8b14 Failing readinessProbe
+Sat May 30 13:00:35 UTC 2020 sidecar-1 6a90c97e8b14 Received SIGTERM

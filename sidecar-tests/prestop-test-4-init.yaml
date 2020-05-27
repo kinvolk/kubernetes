@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: prestop
+  name: prestop
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      run: prestop
+  template:
+    metadata:
+      annotations:
+        alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
+        alpha.kinvolk.io/sidecar-sidecar-2: "dummy"
+      labels:
+        run: prestop
+    spec:
+      initContainers:
+      - name: init-1
+        image: debian
+        command: ["/bin/sh", "-c", "/logs/logs.sh Initialization done"]
+        env:
+          - name: NAME
+            value: "init-1"
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: init-2
+        image: debian
+        command: ["/bin/sh", "-c", "/logs/logs.sh Initialization done"]
+        env:
+          - name: NAME
+            value: "init-2"
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      containers:
+      - name: sidecar-1
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "sidecar-1"
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready || /logs/logs.sh Not Ready"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: sidecar-2
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "sidecar-2"
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready || /logs/logs.sh Not Ready"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: debian-1
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "debian-1"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      - name: debian-2
+        image: debian
+        command: ["/logs/logs.sh", "sleep"]
+        env:
+          - name: NAME
+            value: "debian-2"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+      volumes:
+      - name: logs
+        hostPath:
+          path: /tmp/logs/
