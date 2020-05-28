@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: albantest
+  name: albantest
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: albantest
+  template:
+    metadata:
+      annotations:
+        alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
+        alpha.kinvolk.io/sidecar-sidecar-2: "dummy"
+      labels:
+        run: albantest
+    spec:
+      initContainers:
+      - name: init-1
+        image: debian
+        env:
+          - name: NAME
+            value: "init-1"
+        command: ['sh', '-c', "/logs/log.sh Starting; sleep 5; /logs/log.sh Done"]
+        volumeMounts:
+        - name: workdir1
+          mountPath: /logs
+      - name: init-2
+        image: debian
+        env:
+          - name: NAME
+            value: "init-2"
+        command: ['sh', '-c', "/logs/log.sh Starting; sleep 5; /logs/log.sh Done"]
+        volumeMounts:
+        - name: workdir1
+          mountPath: /logs
+      containers:
+      - image: debian
+        imagePullPolicy: Always
+        name: sidecar-1
+        env:
+          - name: NAME
+            value: "sidecar-1"
+        command: ['sh', '-c', "/logs/log.sh Starting. Sleep 5; sleep 5; touch /tmp/ready ; /logs/log.sh Done ; sleep infinity"]
+        volumeMounts:
+        - name: workdir1
+          mountPath: /logs
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "/logs/log.sh ReadinessProbe; test -f /tmp/ready"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/log.sh PreStop Will-Sleep; sleep 5; /logs/log.sh PreStop-After-Sleep; exit 0" ]
+      - image: debian
+        imagePullPolicy: Always
+        name: sidecar-2
+        env:
+          - name: NAME
+            value: "sidecar-2"
+        command: ['sh', '-c', "/logs/log.sh Starting. Sleep 5; sleep 5; touch /tmp/ready ; /logs/log.sh Done ; sleep infinity"]
+        volumeMounts:
+        - name: workdir1
+          mountPath: /logs
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        readinessProbe:
+          periodSeconds: 1
+          failureThreshold: 1
+          exec:
+            command: ["/bin/sh", "-c", "/logs/log.sh ReadinessProbe; test -f /tmp/ready"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/log.sh PreStop Will-Sleep; sleep 5; /logs/log.sh PreStop-After-Sleep; exit 0" ]
+
+      - image: debian
+        command: ['sh', '-c', "/logs/log.sh Starting; sleep infinity"]
+        env:
+          - name: NAME
+            value: "debian-1"
+        imagePullPolicy: Always
+        name: debian-1
+        volumeMounts:
+        - name: workdir1
+          mountPath: /logs
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/log.sh PreStop Will-Sleep; sleep 5; /logs/log.sh PreStop-After-Sleep; exit 0" ]
+      - image: debian
+        command: ['sh', '-c', "/logs/log.sh Starting; sleep infinity"]
+        env:
+          - name: NAME
+            value: "debian-2"
+        imagePullPolicy: Always
+        name: debian-2
+        volumeMounts:
+        - name: workdir1
+          mountPath: /logs
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "/logs/log.sh PreStop Will-Sleep; sleep 5; /logs/log.sh PreStop-After-Sleep; exit 0" ]
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: workdir1
+        hostPath:
+          path: /tmp/log/
+
