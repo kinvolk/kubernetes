@@ -480,7 +480,9 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kubecontainer.PodStatus, changes *podActions) bool {
 	sidecars, rest := getContainersIdxByType(pod)
 
-	if len(sidecars) == 0 {
+	// Nothing special to do if there are no sidecars or all containers are
+	// sidecars.
+	if len(sidecars) == 0 || len(rest) == 0 {
 		return false
 	}
 
@@ -497,8 +499,8 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 		}
 	}
 
-	// If the other containers are started, the regular sync should be done
-	// for all. Nothing special
+	// If the other containers are started, the regular sync in the calling
+	// function should be done. Nothing special about sidecars to do.
 	if restStarted {
 		return false
 	}
@@ -513,6 +515,18 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 	// TODO: document this limitation. In particular, double check if it can
 	// have weird interactions with sidecars. For example, if we want the
 	// pod to not restart, but of course restart sidecar containers?
+	// XXX: Thinking about ^, there is a weird behavior to consider. If the
+	// restart policy is not Always (let's say it is Never), a sidecar
+	// container is not in running state (but was runnning at some point),
+	// it won't be restarted and never all sidecars were ready at the same
+	// time (as checked at the end of this function). In that case, this
+	// function will wait indefinitely until all sidecars, including that
+	// one, is ready. And that will never happen, due to finished sidecars
+	// not being re-started in that case.
+	// This might be a weird behavior but desired, as non-sidecars may
+	// assume they are created only when sidecars all sidecars running.
+	// TODO: document this corner case and verify what is the expected
+	// behavior.
 
 	// Number of running containers to keep.
 	keepCount := 0
@@ -528,6 +542,14 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
+			// TODO: Review if this can be called here and in the
+			// calling function and create an error?
+			// In the case that a container is dead, this is
+			// executed, and everything is ready just after this,
+			// this could be hit.
+			// This can happen if the sidecar container should not be
+			// restarted and we don't wait for this container to be
+			// ready (currently we do).
 			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
 				klog.Errorf("internal container post-stop lifecycle hook failed for container %v in pod %v with error %v",
 					container.Name, pod.Name, err)
@@ -628,6 +650,10 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 
 		allReady = false
 	}
+
+	// XXX: If restart policy is not Always, and all have at least started once,
+	// consider returning false (not wait) for avoid the weird corner case
+	// mentioned above
 
 	if !allReady {
 		return true
@@ -828,11 +854,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	}
 
 	// From now on, the loop to (re)start containers if needed didn't find
-	// anything to do. Let's check if something needs to be done regarding
-	// sidecars or just return.
-
-	// Check to kill sidecars if there are running containers (keepCount >
-	// 0), as they could potentially be sidecars
+	// anything to do. Let's check if we need to kill sidecars, e.g. if only
+	// sidecars are left running.
 	if keepCount > 0 {
 		m.killSidecars(pod, podStatus, &changes)
 	}
