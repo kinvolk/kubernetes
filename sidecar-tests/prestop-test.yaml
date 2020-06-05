@@ -34,7 +34,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 10; /logs/logs.sh PreStop-After-Sleep; exit 0"]
         volumeMounts:
         - name: logs
           mountPath: /logs
@@ -47,7 +47,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 2; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 10; /logs/logs.sh PreStop-After-Sleep; exit 0"]
         volumeMounts:
         - name: logs
           mountPath: /logs

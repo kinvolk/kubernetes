@@ -633,6 +633,7 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 	// Wait for sidecars to be ready. If they are not ready, return we need
 	// to wait. If some failed, the previous loop should catch it.
 	allReady := true
+	//allStarted := true
 	for idx, container := range pod.Spec.Containers {
 		if _, ok := sidecars[idx]; !ok {
 			continue
