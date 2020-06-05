@@ -4,7 +4,10 @@ metadata:
   labels:
     run: completion
   annotations:
-    alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
+    # XXX: value should be a json encoded list. That means, each string
+    # should be enclosed with double-quote
+    alpha.kinvolk.io/sidecar: '["sidecar-1"]'
+    #alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
   name: completion
   namespace: default
 spec:

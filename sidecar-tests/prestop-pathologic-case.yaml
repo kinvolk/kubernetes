@@ -12,6 +12,9 @@ spec:
   template:
     metadata:
       annotations:
+        # XXX: value should be a json encoded list. That means, each string
+        # should be enclosed with double-quote
+        alpha.kinvolk.io/sidecar: '["sidecar-1", "sidecar-2"]'
         alpha.kinvolk.io/sidecar-sidecar-1: "dummy"
         alpha.kinvolk.io/sidecar-sidecar-2: "dummy"
       labels:
