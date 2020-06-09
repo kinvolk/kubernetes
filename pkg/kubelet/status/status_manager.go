@@ -724,14 +724,14 @@ func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
 	dataJson, ok := pod.Annotations["alpha.kinvolk.io/sidecar"]
 	if !ok {
 		// TODO: remove
-		klog.Error("XXX: rata. getSidecarContainersName Annotation not found! :(")
+		//klog.Error("XXX: rata. getSidecarContainersName Annotation not found! :(")
 		return
 	}
 
 	var containers []string
 	if err := json.Unmarshal([]byte(dataJson), &containers); err != nil {
 		// TODO: remove XXX
-		klog.Errorf("XXX: rata. Can't decode sidecars in annotation: %v", dataJson)
+		//klog.Errorf("XXX: rata. Can't decode sidecars in annotation: %v", dataJson)
 		klog.Errorf("Can't decode sidecars in annotation: %v", dataJson)
 		return
 	}
