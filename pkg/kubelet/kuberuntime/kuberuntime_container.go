@@ -676,14 +676,13 @@ func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
 	// Pod can't be nil
 	dataJson, ok := pod.Annotations[kinvolkSidecarAnn]
 	if !ok {
-		// TODO: consider logging here, with a high level as is expected
-		// for pods to not have sidecars
+		klog.V(5).Infof("Pod: %q does not have a sidecar annotation", format.Pod(pod))
 		return
 	}
 
 	var containers []string
 	if err := json.Unmarshal([]byte(dataJson), &containers); err != nil {
-		klog.Errorf("Can't decode sidecars in annotation: %v", dataJson)
+		klog.Errorf("Can't decode sidecars for pod: %q. Got invalid annotation: %v", format.Pod(pod), dataJson)
 		return
 	}
 
@@ -697,14 +696,13 @@ func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
 	return
 }
 
-// TODO: add doc
+// getContainersIdxByType returns a slice of index of the sidecar containers and
+// another slice with the index of the non-sidecar containers.
+// Assumes the pod is not nil.
 func getContainersIdxByType(pod *v1.Pod) (sidecars, rest map[int]struct{}) {
 	sidecars = map[int]struct{}{}
 	rest = map[int]struct{}{}
 
-	//TODO: will crash if some pod is nil
-	// But can't be nil when called in computePodActions() it seems, double
-	// check
 	sidecarsName := getSidecarContainersName(pod)
 
 	for idx, c := range pod.Spec.Containers {
@@ -718,19 +716,11 @@ func getContainersIdxByType(pod *v1.Pod) (sidecars, rest map[int]struct{}) {
 	return
 }
 
-// TODO: Add doc
+// getContainersByType returns a slice of sidecar and non-sidecar containers in
+// the given pod. If pod in nil, it just returns all as non-sidecars.
 func getContainersByType(pod *v1.Pod, runningPod kubecontainer.Pod) (sidecars, rest []*kubecontainer.Container) {
-	// If pod is nil, the pod is already deleted or the kubelet was
-	// restarted during pod deletion (see doc for
-	// restoreSpecsFromContainerLabels() for more info).
-	// In that case, the functions to restore pod info do not restore
-	// annotations, so we can't get the type.
-	// Therefore, if pod is nil return all running containers as rest.
+	// If pod is nil return all running containers as rest.
 	if pod == nil {
-		// TODO: choose logging level and improve message to add some
-		// info about the pod/containers. But is not trivial, as pod is
-		// nil. Maybe print runningPod.Containers.*.Name
-		klog.Error("Couldn't get container type for nil pod. Using all containers as non-sidecar")
 		rest = runningPod.Containers
 		return
 	}
@@ -763,17 +753,15 @@ func (m *kubeGenericRuntimeManager) getOrRestorePodSpecForKilling(pod *v1.Pod, r
 	}
 
 	for _, container := range runningPod.Containers {
-		// Restore necessary information if one of the specs is nil.
 		restoredPod, spec, err := m.restoreSpecsFromContainerLabels(container.ID)
+
+		// If no err is reported, restoredPod and spec can't be nil
 		if err != nil {
 			return nil, err
 		}
 
 		if pod == nil {
 			pod = restoredPod
-		}
-		if spec == nil {
-			return nil, err
 		}
 
 		pod.Spec.Containers = append(pod.Spec.Containers, *spec)
@@ -782,26 +770,24 @@ func (m *kubeGenericRuntimeManager) getOrRestorePodSpecForKilling(pod *v1.Pod, r
 	return pod, nil
 }
 
+// runSidecarsPreStopHooks runs the preStop hooks for sidecar containers. If
+// the pod is nil or there are no running containers, it just returns without
+// running anything.
 func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, runningPod kubecontainer.Pod) {
-	// If pod is nil, we can't diferentiate sidecars from non sidecars, so
-	// just return here
-	if pod == nil && len(runningPod.Containers) == 0 {
-		return
-	}
-
-	// XXX: this is very similar to if above
-	if pod == nil {
+	if pod == nil || len(runningPod.Containers) == 0 {
+		klog.V(4).Info("Not running sidecars PreStop hooks. Either the pod is nil pod or there are no running containers")
 		return
 	}
 
 	sidecars, _ := getContainersByType(pod, runningPod)
 
 	// Even though this happen to work now with an empty slice, it's more
-	// readable if we just return. It is error prone for the next one
-	// changing the code, too.
+	// readable if we just return.
 	if len(sidecars) == 0 {
+		klog.V(5).Info("Not running sidecars PreStop hooks for pod %q. No sidecar containers found", format.Pod(pod))
 		return
 	}
+	klog.V(5).Infof("Running Sidecars PreStop hooks for pod: %q, containers: %q", format.Pod(pod), runningContainersName(sidecars))
 
 	gracePeriod := getPodGracePeriod(pod)
 
@@ -809,7 +795,7 @@ func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, running
 	wg.Add(len(sidecars))
 
 	for _, container := range sidecars {
-		// Override to avoid issues with closure
+		// Override to avoid issues with closure.
 		container := container
 
 		go func() {
@@ -819,7 +805,7 @@ func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, running
 			// backport instead of moving to a function.
 			containerSpec := kubecontainer.GetContainerSpec(pod, container.Name)
 			if containerSpec == nil {
-				klog.Errorf("Error running sidecar container preStop hook for pod %q, container %q", pod.Name, container.Name)
+				klog.Errorf("Error running sidecar container preStop hook for pod %q, container %q", format.Pod(pod), container.Name)
 				return
 			}
 
@@ -833,12 +819,22 @@ func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, running
 	return
 }
 
+func runningContainersName(runningContainers []*kubecontainer.Container) []string {
+	var ret []string
+
+	for _, c := range runningContainers {
+		ret = append(ret, c.Name)
+	}
+
+	return ret
+}
+
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
 
 	if pod == nil && len(runningPod.Containers) == 0 {
-		//klog.Error("XXX: rata. No pod nor running containers, nothing to kill")
+		klog.V(4).Infof("Pod is nil and there are no running containers. Not killing anything")
 		return
 	}
 
@@ -847,11 +843,12 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 		// is needed to kill the container.
 		// Note that the pod is incomplete and only restored fields
 		// should be used.
+		klog.V(5).Infof("Pod is nil, trying to restore it from annotations")
 		if restoredPod, err := m.getOrRestorePodSpecForKilling(pod, runningPod); err != nil {
-			klog.Errorf("Couldn't restore pod from labels, didn't run preStop hooks on sidecars (if any)")
-			return
+			klog.Errorf("Pod is nil and couldn't restore it from labels. Using all containers as non-sidecar: %q", runningContainersName(runningPod.Containers))
 		} else {
 			pod = restoredPod
+			klog.V(5).Infof("Pod restored from annotations: %q", format.Pod(pod))
 		}
 	}
 
@@ -868,6 +865,10 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 	// sidecars
 	sidecars, rest := getContainersByType(pod, runningPod)
 	containersOrder := [][]*kubecontainer.Container{rest, sidecars}
+
+	if pod != nil {
+		klog.V(5).Infof("Killing pod: %q. Sidecar containers: %q, non-sidecars: %q", format.Pod(pod), runningContainersName(sidecars), runningContainersName(rest))
+	}
 
 	wg := sync.WaitGroup{}
 

@@ -486,6 +486,7 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 	// Nothing special to do if there are no sidecars or all containers are
 	// sidecars.
 	if len(sidecars) == 0 || len(rest) == 0 {
+		klog.V(4).Info("No sidecars or all containers are sidecars for pod: %q. Continuing with the main loop", format.Pod(pod))
 		return false
 	}
 
@@ -505,6 +506,7 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 	// If the other containers are started, the regular sync in the calling
 	// function should be done. Nothing special about sidecars to do.
 	if restStarted {
+		klog.V(5).Info("Non-sidecar containers already started for pod: %q. Continuing with the main loop", format.Pod(pod))
 		return false
 	}
 
@@ -660,6 +662,7 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 	// mentioned above
 
 	if !allReady {
+		klog.V(5).Info("Sidecars for pod %q not yet ready, waiting for them to be ready", format.Pod(pod))
 		return true
 	}
 
@@ -765,6 +768,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	}
 
 	if wait := m.waitForSidecars(pod, podStatus, &changes); wait {
+		klog.V(4).Info("Waiting for sidecars in pod: %q", format.Pod(pod))
 		return changes
 	}
 
@@ -876,12 +880,14 @@ func (m *kubeGenericRuntimeManager) killSidecars(pod *v1.Pod, podStatus *kubecon
 	//   kill here
 
 	if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
+		klog.V(5).Info("Not killing sidecars for pod: %q, pod.Spec.RestartPolicy is Always", format.Pod(pod))
 		return
 	}
 
 	sidecars, rest := getContainersIdxByType(pod)
 
 	if len(sidecars) == 0 {
+		klog.V(5).Info("No sidecar running for pod: %q, not killing sidecars", format.Pod(pod))
 		return
 	}
 
@@ -911,6 +917,7 @@ func (m *kubeGenericRuntimeManager) killSidecars(pod *v1.Pod, podStatus *kubecon
 	// If there is a nonsidecar container that is running,
 	// don't do anything
 	if !nonSidecarsNotRunning {
+		klog.V(5).Info("Found non-sidecar containers running for pod %q. Won't proceed to kill sidecars", format.Pod(pod))
 		return
 	}
 
@@ -924,6 +931,7 @@ func (m *kubeGenericRuntimeManager) killSidecars(pod *v1.Pod, podStatus *kubecon
 		// Don't kill containers that haven't started or are not
 		// running.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+			klog.V(5).Info("Not killing container that is not running: %q pod: %q", container.Name, format.Pod(pod))
 			continue
 		}
 

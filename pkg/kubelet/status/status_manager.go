@@ -723,16 +723,13 @@ func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
 	// Pod can't be nil
 	dataJson, ok := pod.Annotations["alpha.kinvolk.io/sidecar"]
 	if !ok {
-		// TODO: remove
-		//klog.Error("XXX: rata. getSidecarContainersName Annotation not found! :(")
+		klog.V(5).Infof("Pod: %q does not have a sidecar annotation", format.Pod(pod))
 		return
 	}
 
 	var containers []string
 	if err := json.Unmarshal([]byte(dataJson), &containers); err != nil {
-		// TODO: remove XXX
-		//klog.Errorf("XXX: rata. Can't decode sidecars in annotation: %v", dataJson)
-		klog.Errorf("Can't decode sidecars in annotation: %v", dataJson)
+		klog.Errorf("Can't decode sidecars for pod: %q. Got invalid annotation: %v", format.Pod(pod), dataJson)
 		return
 	}
 
@@ -750,9 +747,11 @@ func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
 // in "waiting" status. Otherwise, returns false.
 func StartNonSidecars(pod *v1.Pod) bool {
 	if pod == nil {
+		klog.V(5).Info("Pod is nil, do not start non-sidecars")
 		return false
 	}
 	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		klog.V(5).Info("Either pod.Spec.Containers or pod.Status.ContainerStatuses is nil, do not start non-sidecars")
 		return false
 	}
 
@@ -765,14 +764,14 @@ func StartNonSidecars(pod *v1.Pod) bool {
 	for _, container := range pod.Spec.Containers {
 		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
 		if !ok {
-			klog.V(5).Info("Couldn't get status for container: %q, pod: %q", container.Name, pod.Name)
+			klog.V(5).Infof("Couldn't get status for container: %q, pod: %q", container.Name, format.Pod(pod))
 			continue
 		}
 
 		if _, isSidecar := sidecarsName[container.Name]; isSidecar {
 			sidecarsPresent = true
 			if !status.Ready {
-				klog.V(5).Info("Sidecar container not ready: %q, pod: %q", container.Name, pod.Name)
+				klog.V(5).Infof("Sidecar container not ready: %q, pod: %q", container.Name, format.Pod(pod))
 				sidecarsReady = false
 			}
 
