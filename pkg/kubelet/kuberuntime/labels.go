@@ -127,7 +127,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		annotations[podTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
 	}
 
-	if val, ok := pod.Annotations["alpha.kinvolk.io/sidecar"]; ok {
+	if val, ok := pod.Annotations[kinvolkSidecarAnn]; ok {
 		annotations[podAlphaKinvolkSidecarsLabel] = val
 	}
 

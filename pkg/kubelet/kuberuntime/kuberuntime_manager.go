@@ -63,6 +63,9 @@ const (
 	// A minimal shutdown window for avoiding unnecessary SIGKILLs
 	minimumGracePeriodInSeconds = 2
 
+	// Kinvolk sidecar alpha annotation
+	kinvolkSidecarAnn = "alpha.kinvolk.io/sidecar"
+
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
 	// How frequently to report identical errors

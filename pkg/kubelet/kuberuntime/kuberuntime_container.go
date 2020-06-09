@@ -546,7 +546,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 	}
 
 	if a.AlphaKinvolkSidecars != "" {
-		pod.Annotations = map[string]string{"alpha.kinvolk.io/sidecar": a.AlphaKinvolkSidecars}
+		pod.Annotations = map[string]string{kinvolkSidecarAnn: a.AlphaKinvolkSidecars}
 		klog.Errorf("restoring pod with ann: %v", pod.Annotations)
 	}
 
@@ -674,7 +674,7 @@ func gracePeriodRemaining(pod *v1.Pod, gracePeriodOverride *int64, timeElapsed i
 // the container names as keys when the annotation is found and formed correctly.
 func getSidecarContainersName(pod *v1.Pod) (sidecars map[string]struct{}) {
 	// Pod can't be nil
-	dataJson, ok := pod.Annotations["alpha.kinvolk.io/sidecar"]
+	dataJson, ok := pod.Annotations[kinvolkSidecarAnn]
 	if !ok {
 		// TODO: consider logging here, with a high level as is expected
 		// for pods to not have sidecars
