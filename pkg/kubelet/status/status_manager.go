@@ -780,5 +780,23 @@ func StartNonSidecars(pod *v1.Pod) bool {
 		}
 	}
 
-	return sidecarsPresent && sidecarsReady && othersWaiting
+	klog.V(5).Info("XXXXXXXXXXXXXXXXXX: rata test 3")
+	s := format.Pod(pod)
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for pod: %q", format.Pod(pod))
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for pod: --")
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for pod: %s", pod.Name)
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for pod: %s", pod.Namespace)
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for pod: %s", pod.UID)
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for spod: %s", s)
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for qpod: %q", s)
+	klog.V(5).Infof("XXXX: Starting non-sidecars containers for fpod: %q", format.Pod(pod))
+	ret := sidecarsPresent && sidecarsReady && othersWaiting
+	if ret {
+		klog.V(5).Infof("Starting non-sidecars containers for pod: %q", format.Pod(pod))
+	} else {
+		klog.V(5).Infof("Not starting non-sidecars containers for pod: %q", format.Pod(pod))
+	}
+
+	klog.V(5).Info("XXXXXXXXXXXXXXXXXX: rata test 4")
+	return ret
 }
