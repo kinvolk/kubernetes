@@ -44,10 +44,10 @@ spec:
         env:
           - name: NAME
             value: "debian-1"
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 10; /logs/logs.sh PreStop-After-Sleep; exit 0"]
+            #lifecycle:
+            #  preStop:
+            #    exec:
+            #      #command: ["/bin/sh", "-c", "/logs/logs.sh PreStop Will-Sleep; sleep 10; /logs/logs.sh PreStop-After-Sleep; exit 0"]
         volumeMounts:
         - name: logs
           mountPath: /logs

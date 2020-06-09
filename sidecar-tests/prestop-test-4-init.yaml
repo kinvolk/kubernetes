@@ -50,7 +50,7 @@ spec:
           periodSeconds: 1
           failureThreshold: 1
           exec:
-            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready || /logs/logs.sh Not Ready"]
+            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready && exit 0 || /logs/logs.sh Not Ready && exit 1"]
         lifecycle:
           preStop:
             exec:
@@ -68,7 +68,7 @@ spec:
           periodSeconds: 1
           failureThreshold: 1
           exec:
-            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready || /logs/logs.sh Not Ready"]
+            command: ["/bin/sh", "-c", "test -f /tmp/ready && /logs/logs.sh Ready && exit 0 || /logs/logs.sh Not Ready && exit 1"]
         lifecycle:
           preStop:
             exec:

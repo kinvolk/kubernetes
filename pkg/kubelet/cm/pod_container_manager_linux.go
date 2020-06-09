@@ -154,6 +154,8 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 		return nil
 	}
 
+	//return nil
+
 	var errlist []error
 	// os.Kill often errors out,
 	// We try killing all the pids multiple times

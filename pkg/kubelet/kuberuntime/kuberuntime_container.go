@@ -784,7 +784,7 @@ func (m *kubeGenericRuntimeManager) runSidecarsPreStopHooks(pod *v1.Pod, running
 	// Even though this happen to work now with an empty slice, it's more
 	// readable if we just return.
 	if len(sidecars) == 0 {
-		klog.V(5).Info("Not running sidecars PreStop hooks for pod %q. No sidecar containers found", format.Pod(pod))
+		klog.V(5).Infof("Not running sidecars PreStop hooks for pod %q. No sidecar containers found", format.Pod(pod))
 		return
 	}
 	klog.V(5).Infof("Running Sidecars PreStop hooks for pod: %q, containers: %q", format.Pod(pod), runningContainersName(sidecars))
@@ -834,7 +834,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
 
 	if pod == nil && len(runningPod.Containers) == 0 {
-		klog.V(4).Infof("Pod is nil and there are no running containers. Not killing anything")
+		klog.V(4).Info("Pod is nil and there are no running containers. Not killing anything")
 		return
 	}
 
@@ -843,7 +843,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 		// is needed to kill the container.
 		// Note that the pod is incomplete and only restored fields
 		// should be used.
-		klog.V(5).Infof("Pod is nil, trying to restore it from annotations")
+		klog.V(5).Info("Pod is nil, trying to restore it from annotations")
 		if restoredPod, err := m.getOrRestorePodSpecForKilling(pod, runningPod); err != nil {
 			klog.Errorf("Pod is nil and couldn't restore it from labels. Using all containers as non-sidecar: %q", runningContainersName(runningPod.Containers))
 		} else {
