@@ -763,20 +763,21 @@ func StartNonSidecars(pod *v1.Pod) bool {
 	sidecarsReady := true
 
 	for _, container := range pod.Spec.Containers {
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.Name != container.Name {
-				continue
+		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
+		if !ok {
+			klog.V(5).Info("Couldn't get status for container: %q, pod: %q", container.Name, pod.Name)
+			continue
+		}
+
+		if _, isSidecar := sidecarsName[container.Name]; isSidecar {
+			sidecarsPresent = true
+			if !status.Ready {
+				klog.V(5).Info("Sidecar container not ready: %q, pod: %q", container.Name, pod.Name)
+				sidecarsReady = false
 			}
 
-			if _, isSidecar := sidecarsName[container.Name]; isSidecar {
-				sidecarsPresent = true
-				if !status.Ready {
-					sidecarsReady = false
-				}
-
-			} else if status.State.Waiting != nil {
-				othersWaiting = true
-			}
+		} else if status.State.Waiting != nil {
+			othersWaiting = true
 		}
 	}
 
