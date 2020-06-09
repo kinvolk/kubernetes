@@ -517,21 +517,6 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 	// The call to kubecontainer.ShouldContainerBeRestarted() there, will
 	// NOT RESTART if the **container** has been started at least once and
 	// the **pod** restart policy is v1.RestartPolicyNever
-	// TODO: document this limitation. In particular, double check if it can
-	// have weird interactions with sidecars. For example, if we want the
-	// pod to not restart, but of course restart sidecar containers?
-	// XXX: Thinking about ^, there is a weird behavior to consider. If the
-	// restart policy is not Always (let's say it is Never), a sidecar
-	// container is not in running state (but was runnning at some point),
-	// it won't be restarted and never all sidecars were ready at the same
-	// time (as checked at the end of this function). In that case, this
-	// function will wait indefinitely until all sidecars, including that
-	// one, is ready. And that will never happen, due to finished sidecars
-	// not being re-started in that case.
-	// This might be a weird behavior but desired, as non-sidecars may
-	// assume they are created only when sidecars all sidecars running.
-	// TODO: document this corner case and verify what is the expected
-	// behavior.
 
 	// Number of running containers to keep.
 	keepCount := 0
@@ -547,14 +532,10 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
-			// TODO: Review if this can be called here and in the
-			// calling function and create an error?
-			// In the case that a container is dead, this is
-			// executed, and everything is ready just after this,
-			// this could be hit.
-			// This can happen if the sidecar container should not be
-			// restarted and we don't wait for this container to be
-			// ready (currently we do).
+			// XXX: This can't be called here and in the calling function and, therefore, cause an error.
+			// In the case that a container is dead, this is executed, and everything is ready just after this,
+			// this could be hit. But can't happen as the dead container is not ready, therefore this function
+			// will return "true" and the analogous code-path in the calling function is not executed.
 			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
 				klog.Errorf("internal container post-stop lifecycle hook failed for container %v in pod %v with error %v",
 					container.Name, pod.Name, err)
