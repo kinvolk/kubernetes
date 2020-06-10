@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -647,6 +648,139 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
 	}
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container completed; all app containers should be running")
+
+	// 4. should restart the init container if needed to create a new podsandbox
+	// Stop the pod sandbox.
+	fakeRuntime.StopPodSandbox(sandboxID)
+	// Sync again.
+	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected = []*cRecord{
+		// The first init container instance is purged and no longer visible.
+		// The second (attempt == 1) instance has been started and is running.
+		{name: initContainers[0].Name, attempt: 1, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		// All containers are killed.
+		{name: containers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "kill all app containers, purge the existing init container, and restart a new one")
+}
+
+func TestSyncPodWithSidecarsAndInitContainers(t *testing.T) {
+	fmt.Printf("TestSyncPodWithSidecarsAndInitContainers: Called\n")
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	initContainers := []v1.Container{
+		{
+			Name:            "init1",
+			Image:           "init",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "alpine",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+			Annotations: map[string]string{
+				"alpha.kinvolk.io/sidecar": `["foo2"]`,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers:     containers,
+			InitContainers: initContainers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// 1. should only create the init container.
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected := []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
+
+	// 2. should not create app container because init container is still running.
+	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
+
+	// 3. should create all sidecar containers because init container finished.
+	// Stop init container instance 0.
+	sandboxIDs, err := m.getSandboxIDByPodUID(pod.UID, nil)
+	require.NoError(t, err)
+	sandboxID := sandboxIDs[0]
+	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
+	require.NoError(t, err)
+	fakeRuntime.StopContainer(initID0, 0)
+	// Sync again.
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{
+		{
+			Name:  "foo1",
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
+		},
+		{
+			Name:  "foo2",
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
+		},
+	}
+	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	fmt.Printf("TestSyncPodWithSidecarsAndInitContainers -> SyncPod: Called\n")
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "init container completed; all sidecar containers should be running")
+
+	//4 Should start non-sidecars once sidecars are ready
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{
+		{
+			Name:  "foo1",
+			Ready: true,
+			State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+		},
+		{
+			Name:  "foo2",
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
+		},
+	}
+	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	fmt.Printf("TestSyncPodWithSidecarsAndInitContainers -> call SyncPod: %+v\n", podStatus.ContainerStatuses)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	fmt.Printf("TestSyncPodWithSidecarsAndInitContainers -> checking: init container completed, sidecars ready; all containers should be running\n")
+	verifyContainerStatuses(t, fakeRuntime, expected, "init container completed, sidecars ready; all containers should be running")
+	fmt.Printf("TestSyncPodWithSidecarsAndInitContainers -> checked: init container completed, sidecars ready; all containers should be running\n")
 
 	// 4. should restart the init container if needed to create a new podsandbox
 	// Stop the pod sandbox.
