@@ -416,11 +416,18 @@ func TestKillPod(t *testing.T) {
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
+			Annotations: map[string]string{
+				"alpha.kinvolk.io/sidecar": `["sidecar"]`,
+			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
 					Name:  "foo1",
+					Image: "busybox",
+				},
+				{
+					Name:  "sidecar",
 					Image: "busybox",
 				},
 				{
@@ -463,7 +470,7 @@ func TestKillPod(t *testing.T) {
 		ID:         pod.UID,
 		Name:       pod.Name,
 		Namespace:  pod.Namespace,
-		Containers: []*kubecontainer.Container{containers[0], containers[1], containers[2]},
+		Containers: []*kubecontainer.Container{containers[0], containers[1], containers[2], containers[3]},
 		Sandboxes: []*kubecontainer.Container{
 			{
 				ID: kubecontainer.ContainerID{
@@ -476,7 +483,10 @@ func TestKillPod(t *testing.T) {
 
 	err = m.KillPod(pod, runningPod, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(fakeRuntime.Containers))
+	assert.Equal(t, 4, len(fakeRuntime.Containers))
+	//check that the sidecar was terminated last, after the other containers
+	assert.Equal(t, "foo_new_12345678_0_sidecar_0", fakeRuntime.ContainersKilled[len(fakeRuntime.ContainersKilled)-1])
+
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State)
@@ -985,6 +995,7 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 			actual.ContainersToKill[k] = info
 		}
 	}
+
 	assert.Equal(t, expected, actual, desc)
 }
 
@@ -1315,6 +1326,8 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
+
+
 
 func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontainer.PodStatus) {
 	pod, status := makeBasePodAndStatus()
