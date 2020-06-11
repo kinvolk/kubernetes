@@ -1801,7 +1801,13 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 		}
 		actions := m.computePodActions(pod, status)
 		//TODO(Alban): remove this Logf
-		t.Logf("Check pod (%s): %v\n", desc, pod)
+		if len(status.ContainerStatuses) == 3 {
+			t.Logf("Check pod (%s): \npod %+v\ncontainer1 %+v %+v\ncontainer2 %+v %+v\ncontainer3 %+v %+v\n",
+				desc, pod,
+				status.ContainerStatuses[0].Name, status.ContainerStatuses[0],
+				status.ContainerStatuses[1].Name, status.ContainerStatuses[1],
+				status.ContainerStatuses[2].Name, status.ContainerStatuses[2])
+		}
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
