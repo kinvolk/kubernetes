@@ -1865,28 +1865,30 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 				ContainersToStart: []int{},
 			},
 		},
-		"Don't recreate sandbox when sidecar exited in failure on shutdown": {
-			mutatePodFn: func(pod *v1.Pod) {
-				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-			},
-			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				status.SandboxStatuses = []*runtimeapi.PodSandboxStatus{}
-				for i := range status.ContainerStatuses {
-					if i == 1 {
-						status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
-						status.ContainerStatuses[i].ExitCode = 1
-					}
-					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
-					status.ContainerStatuses[i].ExitCode = 0
-				}
-			},
-			actions: podActions{
-				KillPod:           true,
-				SandboxID:         "",
-				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
-				ContainersToStart: []int{},
-			},
-		},
+		// No need to treat sidecar containers differently on failure
+		// either. removing the test
+		//"Don't recreate sandbox when sidecar exited in failure on shutdown": {
+		//	mutatePodFn: func(pod *v1.Pod) {
+		//		pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+		//	},
+		//	mutateStatusFn: func(status *kubecontainer.PodStatus) {
+		//		status.SandboxStatuses = []*runtimeapi.PodSandboxStatus{}
+		//		for i := range status.ContainerStatuses {
+		//			if i == 1 {
+		//				status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
+		//				status.ContainerStatuses[i].ExitCode = 1
+		//			}
+		//			status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
+		//			status.ContainerStatuses[i].ExitCode = 0
+		//		}
+		//	},
+		//	actions: podActions{
+		//		KillPod:           true,
+		//		SandboxID:         "",
+		//		ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+		//		ContainersToStart: []int{},
+		//	},
+		//},
 		"Start sidecar containers before non-sidecars when creating a new pod": {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				// No container or sandbox exists.
@@ -1906,9 +1908,6 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{
 					{
 						Name: "foo1",
-						State: v1.ContainerState{
-							Waiting: &v1.ContainerStateWaiting{},
-						},
 					},
 					{
 						Name:  "foo2",
@@ -1916,18 +1915,7 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 					},
 					{
 						Name: "foo3",
-						State: v1.ContainerState{
-							Waiting: &v1.ContainerStateWaiting{},
-						},
 					},
-				}
-			},
-			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				for i := range status.ContainerStatuses {
-					if i == 1 {
-						continue
-					}
-					status.ContainerStatuses[i].State = ""
 				}
 			},
 			actions: podActions{
@@ -2014,9 +2002,6 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{
 					{
 						Name: "foo1",
-						State: v1.ContainerState{
-							Waiting: &v1.ContainerStateWaiting{},
-						},
 					},
 					{
 						Name:  "foo2",
@@ -2024,9 +2009,6 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 					},
 					{
 						Name: "foo3",
-						State: v1.ContainerState{
-							Waiting: &v1.ContainerStateWaiting{},
-						},
 					},
 				}
 			},
@@ -2035,7 +2017,6 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 					if i == 1 {
 						status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
 					}
-					status.ContainerStatuses[i].State = ""
 				}
 			},
 			actions: podActions{
@@ -2120,14 +2101,11 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		actions := m.computePodActions(pod, status)
-		//TODO(Alban): remove this Logf
-		if len(status.ContainerStatuses) == 3 {
-			t.Logf("Check pod (%s): \npod %+v\ncontainer1 %+v %+v\ncontainer2 %+v %+v\ncontainer3 %+v %+v\n",
-				desc, pod,
-				status.ContainerStatuses[0].Name, status.ContainerStatuses[0],
-				status.ContainerStatuses[1].Name, status.ContainerStatuses[1],
-				status.ContainerStatuses[2].Name, status.ContainerStatuses[2])
-		}
+		//if desc == "Restart only sidecars while non-sidecars are waiting" {
+		//	t.Logf("XXXXX: rata")
+		//	t.Logf("XXXX: Got actions: %+v", actions)
+		//	t.Logf("XXXX: Expected actions: %+v", test.actions)
+		//}
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
