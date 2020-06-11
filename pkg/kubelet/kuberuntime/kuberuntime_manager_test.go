@@ -2107,11 +2107,6 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		actions := m.computePodActions(pod, status)
-		//if desc == "Restart only sidecars while non-sidecars are waiting" {
-		//	t.Logf("XXXXX: rata")
-		//	t.Logf("XXXX: Got actions: %+v", actions)
-		//	t.Logf("XXXX: Expected actions: %+v", test.actions)
-		//}
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
