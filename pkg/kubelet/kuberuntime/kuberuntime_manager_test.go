@@ -1315,14 +1315,20 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 			actual.ContainersToKill[k] = info
 		}
 	}
+	//if expected.ContainersToKill != nil {
+	//	// Clear the message field since we don't need to verify the message.
+	//	for k, info := range expected.ContainersToKill {
+	//		info.message = ""
+	//		actual.ContainersToKill[k] = info
+	//	}
+	//}
+
 	assert.Equal(t, expected, actual, desc)
 }
 
 func makeBasePodAndStatusWithSidecar() (*v1.Pod, *kubecontainer.PodStatus) {
 	pod, status := makeBasePodAndStatus()
-	pod.ObjectMeta.Annotations = map[string]string{
-		"alpha.kinvolk.io/sidecar": `["foo2"]`,
-	}
+	pod.Annotations = map[string]string{"alpha.kinvolk.io/sidecar": `["foo2"]`}
 	status.ContainerStatuses[1].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[1])
 
 	return pod, status
