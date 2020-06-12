@@ -492,10 +492,8 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
-	if kl.experimentalHostUserNamespaceDefaulting {
-		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
-	}
+	opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
+	klog.V(5).Infof("opts.EnableHostUserNamespace %v for pod %s", opts.EnableHostUserNamespace, pod.Name)
 
 	return opts, cleanupAction, nil
 }
@@ -1767,12 +1765,11 @@ func hasHostVolume(pod *v1.Pod) bool {
 	return false
 }
 
-// hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true.
+// hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true or userNamespaceRemapping is set to false.
 func hasHostNamespace(pod *v1.Pod) bool {
-	if pod.Spec.SecurityContext == nil {
-		return false
-	}
-	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID
+	// TODO(Alban): use helper function and constants
+	userns, _ := pod.Annotations["alpha.kinvolk.io/userns"]
+	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID || userns != "enabled"
 }
 
 // hasHostMountPVC returns true if a PVC is referencing a HostPath volume.
