@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-userns
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "enabled"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: pod-userns
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+
