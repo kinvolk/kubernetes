@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-simple
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "disabled"
+spec:
+  containers:
+  - name: pod-simple
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+
