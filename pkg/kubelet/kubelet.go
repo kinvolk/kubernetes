@@ -1267,14 +1267,16 @@ func (kl *Kubelet) setupDataDirs() error {
 }
 
 // chownDirForRemappedIDs change dir and path ownerships if UserNamespace is enabled at container runtime
+// noop if UserNamespace is disabled
 func (kl *Kubelet) chownDirForRemappedIDs(path string) error {
 	isUseNamespaceSupportedAndEnabled, err := kl.isUserNamespaceRemappingEnabledAtRuntime()
+	if err != nil {
+		klog.Warningf("error while determining usernamespace configuration at runtime: %v", err)
+		return nil
+	}
 	if !isUseNamespaceSupportedAndEnabled {
 		// No-Op if UserNamespace remapping is not enabled at runtime
 		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("error while determining usernamespace configuration at runtime: %v", err)
 	}
 	if path == "" {
 		return fmt.Errorf("path to be setup is empty")
