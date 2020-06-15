@@ -120,7 +120,7 @@ type Runtime interface {
 	// GetHostUID returns the uid from the host usernamespace that is mapped to the container usernamespace uid, containerUID
 	GetHostUID(containerUID int) (int, error)
 	// GetHostGID returns the gid from the host usernamespace that is mapped to the container usernamespace gid, containerGID
-	GetHostGID(containerUID int) (int, error)
+	GetHostGID(containerGID int) (int, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
