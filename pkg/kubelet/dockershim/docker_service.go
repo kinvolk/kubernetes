@@ -377,15 +377,11 @@ func isUserNsEnabled(dockerInfo *dockertypes.Info) bool {
 
 // getRremappedNonRootHostID parses docker info to determine ID on the host usernamespace which is mapped to {U/G}ID 0 in the container user-namespace
 func getRemappedNonRootHostID(dockerInfo *dockertypes.Info) (uint32, error) {
-	if strings.HasPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/") {
-		remappedNonRootHostID64, err := strconv.ParseUint(strings.Split(strings.TrimPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/"), ".")[0], 10, 0)
-		if err != nil {
-			return uint32(0), fmt.Errorf("failed to parse DockerRootDir, %v: %v", dockerInfo.DockerRootDir, err)
-		}
-		return uint32(remappedNonRootHostID64), nil
-	} else {
-		return uint32(0), fmt.Errorf("unexpected DockerRootDir, %v. Expected prefixed with '/var/lib/docker' ", dockerInfo.DockerRootDir)
+	remappedNonRootHostID64, err := strconv.ParseUint(strings.Split(path.Base(dockerInfo.DockerRootDir), ".")[0], 10, 0)
+	if err != nil {
+		return uint32(0), fmt.Errorf("failed to parse DockerRootDir, %v: %v", dockerInfo.DockerRootDir, err)
 	}
+	return uint32(remappedNonRootHostID64), nil
 }
 
 // getUserNsMappingSizes return uid and gid mapping sizes
