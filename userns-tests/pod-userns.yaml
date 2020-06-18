@@ -6,6 +6,7 @@ metadata:
   annotations:
     alpha.kinvolk.io/userns: "enabled"
 spec:
+  restartPolicy: Never
   containers:
   - name: pod-userns
     image: busybox
