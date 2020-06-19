@@ -204,7 +204,7 @@ message Mount {
 }
 
 // A NamespaceMode describes the intended namespace configuration for each
-// of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
+// of the namespaces (Network, PID, IPC, User) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
 enum NamespaceMode {
     // A POD namespace is common to all containers in a pod.
@@ -219,14 +219,6 @@ enum NamespaceMode {
     // For example, a container with a PID namespace of NODE expects to view
     // all of the processes on the host running the kubelet.
     NODE      = 2;
-    // A NODE_WIDE_REMAPPED namespace applies to all pods on a given kubernetes node.
-    // The uid/gids of the pods/containers on a given node are mapped to a range of uids/gids
-    // from that Node's namespace. For e.g. starting with 200000 id on the nodes namespace,
-    // 10000 ids are allocated for a pod. This means uid/gid 0 inside the pod would map to 200000 id on the nodes namespace.
-    // For example, starting from uid/gid 0, 10000 uids/gids in this namespace are mapped to
-    // 10000 ids on node namespace,starting with id 200000. i.e uid/gid 0 in this namespace is
-    // mapped to uid/gid 200000 on node namespace.
-    NODE_WIDE_REMAPPED = 3;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -246,9 +238,8 @@ message NamespaceOption {
     NamespaceMode ipc = 3;
     // User namespace for this container/sandbox.
     // Note: There is currently no way to set CONTAINER scoped user namespace in the Kubernetes API.
-    // The container runtime should ignore this if user namespace is NOT enabled.
-    // NODE is the default value. Kubelet will set it to NODE_WIDE_REMAPPED if pod spec indicates to use user-namespace remapping
-    // Namespaces currently set by the kubelet: NODE, NODE_WIDE_REMAPPED
+    // NODE is the default value. Kubelet will set it to POD if pod spec indicates to use user-namespace remapping
+    // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode user = 4;
 }
 

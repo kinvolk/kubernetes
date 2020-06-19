@@ -172,7 +172,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		if m.runtimeConfig != nil && m.runtimeConfig.IsUserNamespaceSupported() && !userNamespaceDefinedForPod(pod) {
 			// if HostUserNamespace is not specified explicitly in pod, behavior is runtime defined
 			if m.runtimeConfig.IsUserNamespaceEnabled() {
-				lc.SecurityContext.NamespaceOptions.User = runtimeapi.NamespaceMode_NODE_WIDE_REMAPPED
+				lc.SecurityContext.NamespaceOptions.User = runtimeapi.NamespaceMode_POD
 			} else {
 				lc.SecurityContext.NamespaceOptions.User = runtimeapi.NamespaceMode_NODE
 			}
