@@ -339,11 +339,11 @@ func (ds *dockerService) GetRuntimeConfigInfo(_ context.Context, r *runtimeapi.G
 	if isUserNsEnabled(dockerInfo) {
 		remappedNonRootHostID, err := getRemappedNonRootHostID(dockerInfo)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get remappedNonRootHostID. err: %v", err)
+			return nil, fmt.Errorf("failed to get remappedNonRootHostID: %v", err)
 		}
 		uidMappingSize, gidMappingSize, err := getUserNsMappingSizes(remappedNonRootHostID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get user-namespace mapping sizes. err: %v", err)
+			return nil, fmt.Errorf("failed to get user-namespace mapping sizes: %v", err)
 		}
 
 		uidMapping.HostId = remappedNonRootHostID
@@ -365,17 +365,15 @@ func (ds *dockerService) GetRuntimeConfigInfo(_ context.Context, r *runtimeapi.G
 
 // isUserNsEnabled parses docker info. Returns true if user-namespace feature is found to enabled, otherwise false
 func isUserNsEnabled(dockerInfo *dockertypes.Info) bool {
-	var usernsEnabled bool
 	for _, secOpt := range dockerInfo.SecurityOptions {
 		if strings.Contains(secOpt, "userns") {
-			usernsEnabled = true
-			break
+			return true
 		}
 	}
-	return usernsEnabled
+	return false
 }
 
-// getRremappedNonRootHostID parses docker info to determine ID on the host usernamespace which is mapped to {U/G}ID 0 in the container user-namespace
+// getRemappedNonRootHostID parses docker info to determine ID on the host usernamespace which is mapped to {U/G}ID 0 in the container user-namespace
 func getRemappedNonRootHostID(dockerInfo *dockertypes.Info) (uint32, error) {
 	if strings.HasPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/") {
 		remappedNonRootHostID64, err := strconv.ParseUint(strings.Split(strings.TrimPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/"), ".")[0], 10, 0)
@@ -396,7 +394,7 @@ func getUserNsMappingSizes(remappedNonRootHostID uint32) (uint32, uint32, error)
 	}
 	uidMappingSize, err := getIDMappingSize(mappings, remappedNonRootHostID)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get uid mapping size. err: %v", err)
+		return 0, 0, fmt.Errorf("failed to get uid mapping size: %v", err)
 	}
 
 	mappings, err = ioutil.ReadFile("/etc/subgid")
@@ -405,7 +403,7 @@ func getUserNsMappingSizes(remappedNonRootHostID uint32) (uint32, uint32, error)
 	}
 	gidMappingSize, err := getIDMappingSize(mappings, remappedNonRootHostID)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get gid mapping size. err: %v", err)
+		return 0, 0, fmt.Errorf("failed to get gid mapping size: %v", err)
 	}
 	return uidMappingSize, gidMappingSize, nil
 }
