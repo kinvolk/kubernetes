@@ -20,5 +20,5 @@ package kubelet
 
 // Do nothing.
 func (kl *Kubelet) getOwnerIDsFor(path string) (int, int, error) {
-	return -1, -1, nil
+	return 0, 0, nil
 }

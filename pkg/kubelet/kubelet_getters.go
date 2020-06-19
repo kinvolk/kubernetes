@@ -228,12 +228,12 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 }
 
 // getHostUID returns the uid from the host usernamespace that is mapped to given UID on container user-namespace
-func (kl *Kubelet) getHostUID(containerUID int) (int, error) {
+func (kl *Kubelet) getHostUID(containerUID uint32) (uint32, error) {
 	return kl.containerRuntime.GetHostUID(containerUID)
 }
 
 // getHostGID returns the gid from the host usernamespace that is mapped to given GID on container user-namespace
-func (kl *Kubelet) getHostGID(containerGID int) (int, error) {
+func (kl *Kubelet) getHostGID(containerGID uint32) (uint32, error) {
 	return kl.containerRuntime.GetHostGID(containerGID)
 }
 

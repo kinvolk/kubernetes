@@ -332,13 +332,13 @@ func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.Runti
 }
 
 // GetHostUID returns UID on host namespace which is mapped to given UID on container namespace
-func (m *kubeGenericRuntimeManager) GetHostUID(containerUID int) (int, error) {
-	return m.runtimeConfig.GetHostUIDFor(uint32(containerUID))
+func (m *kubeGenericRuntimeManager) GetHostUID(containerUID uint32) (uint32, error) {
+	return m.runtimeConfig.GetHostUIDFor(containerUID)
 }
 
 // GetHostGID returns GID on host namespace which is mapped to given GID on container namespace
-func (m *kubeGenericRuntimeManager) GetHostGID(containerGID int) (int, error) {
-	return m.runtimeConfig.GetHostGIDFor(uint32(containerGID))
+func (m *kubeGenericRuntimeManager) GetHostGID(containerGID uint32) (uint32, error) {
+	return m.runtimeConfig.GetHostGIDFor(containerGID)
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter

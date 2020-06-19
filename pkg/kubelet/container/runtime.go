@@ -118,9 +118,9 @@ type Runtime interface {
 	// GetRuntimeConfigInfo returns runtime's configuration details, eg: if user-namespaces are enabled or not
 	GetRuntimeConfigInfo() (*RuntimeConfigInfo, error)
 	// GetHostUID returns the uid from the host usernamespace that is mapped to the container usernamespace uid, containerUID
-	GetHostUID(containerUID int) (int, error)
+	GetHostUID(containerUID uint32) (uint32, error)
 	// GetHostGID returns the gid from the host usernamespace that is mapped to the container usernamespace gid, containerGID
-	GetHostGID(containerGID int) (int, error)
+	GetHostGID(containerGID uint32) (uint32, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -508,23 +508,23 @@ func (c *RuntimeConfigInfo) IsUserNamespaceSupported() bool {
 }
 
 // GetHostUIDFor returns uid on host usernamespace that is mapped to the given uid in container usernamespace
-func (c *RuntimeConfigInfo) GetHostUIDFor(containerUID uint32) (int, error) {
+func (c *RuntimeConfigInfo) GetHostUIDFor(containerUID uint32) (uint32, error) {
 	for _, mapping := range c.UserNamespaceConfig.UidMappings {
 		if containerUID >= mapping.ContainerID && containerUID < mapping.ContainerID+mapping.Size {
-			return int(mapping.HostID + (containerUID - mapping.ContainerID)), nil
+			return mapping.HostID + (containerUID - mapping.ContainerID), nil
 		}
 	}
-	return -1, fmt.Errorf("IdMapping not found for container usernamespace UID %v", containerUID)
+	return 0, fmt.Errorf("IdMapping not found for container usernamespace UID %v", containerUID)
 }
 
 // GetHostGIDFor returns gid on host usernamespace that is mapped to the given gid in container usernamespace
-func (c *RuntimeConfigInfo) GetHostGIDFor(containerGID uint32) (int, error) {
+func (c *RuntimeConfigInfo) GetHostGIDFor(containerGID uint32) (uint32, error) {
 	for _, mapping := range c.UserNamespaceConfig.GidMappings {
 		if containerGID >= mapping.ContainerID && containerGID < mapping.ContainerID+mapping.Size {
-			return int(mapping.HostID + (containerGID - mapping.ContainerID)), nil
+			return mapping.HostID + (containerGID - mapping.ContainerID), nil
 		}
 	}
-	return -1, fmt.Errorf("IdMapping not found for container usernamespace GID %v", containerGID)
+	return 0, fmt.Errorf("IdMapping not found for container usernamespace GID %v", containerGID)
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
