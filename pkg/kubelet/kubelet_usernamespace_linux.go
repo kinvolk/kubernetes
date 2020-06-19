@@ -25,16 +25,16 @@ import (
 )
 
 // getOwnerIDsFor returns UID and GID of the path
-func (kl *Kubelet) getOwnerIDsFor(path string) (int, int, error) {
+func (kl *Kubelet) getOwnerIDsFor(path string) (uint32, uint32, error) {
 	fi, err := os.Lstat(path)
 	if err != nil {
-		return -1, -1, err
+		return 0, 0, err
 	}
 
 	s, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
-		return -1, -1, fmt.Errorf("could not get IDs for path %s. Error in converting stat value to syscall.Stat_t", path)
+		return 0, 0, fmt.Errorf("could not get IDs for path %s. Error in converting stat value to syscall.Stat_t", path)
 	}
 
-	return int(s.Uid), int(s.Gid), nil
+	return s.Uid, s.Gid, nil
 }

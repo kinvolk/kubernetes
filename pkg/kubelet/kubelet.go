@@ -1308,8 +1308,8 @@ func (kl *Kubelet) chownAllFilesAt(dir string) error {
 			klog.V(5).Infof("GID, %v, for path %v is not equal to 0. Skipping chowing assuming it to be FsGroup GID ", fileGID, file)
 			continue
 		}
-		containerUID := 0
-		containerGID := 0
+		containerUID := uint32(0)
+		containerGID := uint32(0)
 		uid, err := kl.getHostUID(containerUID)
 		if err != nil {
 			return fmt.Errorf("Failed to get remapped host UID corresponding to UID 0 in container namespace: %v", err)
@@ -1319,7 +1319,7 @@ func (kl *Kubelet) chownAllFilesAt(dir string) error {
 			return fmt.Errorf("Failed to get remapped host GID corresponding to GID 0 in container namespace: %v", err)
 		}
 		klog.V(5).Infof("Remapped default uid %d, default gid %d path %s", uid, gid, file)
-		err = os.Chown(file, uid, gid)
+		err = os.Chown(file, int(uid), int(gid))
 		if err != nil {
 			return err
 		}
