@@ -12,4 +12,4 @@ spec:
     image: busybox
     command: ["sh"]
     args: ["-c", "sleep infinity"]
-
+#  hostNetwork: true

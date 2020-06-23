@@ -26,7 +26,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -688,6 +687,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		legacyLogProvider,
 		klet.runtimeClassManager,
+		klet.kubeClient,
 	)
 	if err != nil {
 		return nil, err
@@ -1215,17 +1215,6 @@ type Kubelet struct {
 	runtimeClassManager *runtimeclass.Manager
 }
 
-// isUserNamespaceRemappingEnabledAtRuntime return true if usernamespace remapping is enabled in configurations
-func (kl *Kubelet) isUserNamespaceRemappingEnabledAtRuntime() (bool, error) {
-	ci, err := kl.containerRuntime.GetRuntimeConfigInfo()
-	if err != nil {
-		return false, fmt.Errorf("failed to get container runtime info: %v", err)
-	}
-	klog.V(4).Infof("Container runtime config info: %v", ci)
-
-	return ci.IsUserNamespaceSupported() && ci.IsUserNamespaceEnabled(), nil
-}
-
 // setupDataDirs creates:
 // 1.  the root directory
 // 2.  the pods directory
@@ -1261,67 +1250,6 @@ func (kl *Kubelet) setupDataDirs() error {
 		err = selinux.SetFileLabel(pluginsDir, config.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
 			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", pluginsDir, err)
-		}
-	}
-	return nil
-}
-
-// chownDirForRemappedIDs change dir and path ownerships if UserNamespace is enabled at container runtime
-// noop if UserNamespace is disabled
-func (kl *Kubelet) chownDirForRemappedIDs(path string) error {
-	isUseNamespaceSupportedAndEnabled, err := kl.isUserNamespaceRemappingEnabledAtRuntime()
-	if err != nil {
-		klog.Warningf("error while determining usernamespace configuration at runtime: %v", err)
-		return nil
-	}
-	if !isUseNamespaceSupportedAndEnabled {
-		// No-Op if UserNamespace remapping is not enabled at runtime
-		return nil
-	}
-	if path == "" {
-		return fmt.Errorf("path to be setup is empty")
-	}
-	if err := kl.chownAllFilesAt(path); err != nil {
-		return fmt.Errorf("error setting ownership to remapped IDs on %s: %v", path, err)
-	}
-	return nil
-}
-
-// chownAllFilesAt traverses the directory tree at the give path and chowns the paths to adjust for the remapped usernamespaces
-func (kl *Kubelet) chownAllFilesAt(dir string) error {
-	var files []string
-
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		files = append(files, path)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	klog.V(5).Infof("Chowned paths %v", files)
-	for _, file := range files {
-		_, fileGID, err := kl.getOwnerIDsFor(file)
-		if err != nil {
-			return fmt.Errorf("error in getting volume path owner UID/GID: %v", err)
-		}
-		if fileGID != 0 {
-			klog.V(5).Infof("GID, %v, for path %v is not equal to 0. Skipping chowing assuming it to be FsGroup GID ", fileGID, file)
-			continue
-		}
-		containerUID := uint32(0)
-		containerGID := uint32(0)
-		uid, err := kl.getHostUID(containerUID)
-		if err != nil {
-			return fmt.Errorf("Failed to get remapped host UID corresponding to UID 0 in container namespace: %v", err)
-		}
-		gid, err := kl.getHostGID(containerGID)
-		if err != nil {
-			return fmt.Errorf("Failed to get remapped host GID corresponding to GID 0 in container namespace: %v", err)
-		}
-		klog.V(5).Infof("Remapped default uid %d, default gid %d path %s", uid, gid, file)
-		err = os.Chown(file, int(uid), int(gid))
-		if err != nil {
-			return err
 		}
 	}
 	return nil
@@ -1420,10 +1348,6 @@ func (kl *Kubelet) initializeModules() error {
 
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
-	if err := kl.chownDirForRemappedIDs(kl.getPodsDir()); err != nil {
-		klog.Fatalf("Kubelet failed to change kubelet pod dir ownership to remapped user: %v", err)
-	}
-
 	if err := kl.cadvisor.Start(); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		// TODO(random-liu): Add backoff logic in the babysitter
@@ -1753,16 +1677,6 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 
-	// TODO(Alban): use helper function and constants
-	userns, _ := pod.Annotations["alpha.kinvolk.io/userns"]
-	klog.V(4).Infof("pod userns setting: %v", userns)
-	if userns == "enabled" {
-		if err := kl.chownDirForRemappedIDs(kl.getPodVolumesDir(pod.UID)); err != nil {
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to set ownership on mount volumes for pod %q: %v", format.Pod(pod), err)
-			klog.Errorf("Unable to chown volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
-			return err
-		}
-	}
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff

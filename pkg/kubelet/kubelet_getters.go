@@ -111,6 +111,13 @@ func (kl *Kubelet) getPodVolumeSubpathsDir(podUID types.UID) string {
 // getPodVolumesDir returns the full path to the per-pod data directory under
 // which volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist.
+func (kl *Kubelet) GetPodVolumesDir(podUID types.UID) string {
+	return kl.getPodVolumesDir(podUID)
+}
+
+// getPodVolumesDir returns the full path to the per-pod data directory under
+// which volumes are created for the specified pod.  This directory may not
+// exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
 	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletVolumesDirName)
 }

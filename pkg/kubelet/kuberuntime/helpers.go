@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,6 +28,17 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type UsernsAnn int
+
+const (
+	UsernsInvalid UsernsAnn = iota
+	UsernsRuntimeDefault
+	UsernsPod
+	UsernsNode
 )
 
 type podsByID []*kubecontainer.Pod
@@ -301,39 +313,173 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 
-func userNamespaceDefinedForPod(pod *v1.Pod) bool {
-	if pod == nil {
-		return false
+// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
+// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
+func (m *kubeGenericRuntimeManager) namespacesForPod(pod *v1.Pod) (*runtimeapi.NamespaceOption, error) {
+	user, err := m.userNamespaceForPod(pod)
+	if err != nil {
+		return nil, err
 	}
-	userns, ok := pod.Annotations["alpha.kinvolk.io/userns"]
-	if !ok {
-		return false
+
+	return &runtimeapi.NamespaceOption{
+		Ipc:     ipcNamespaceForPod(pod),
+		Network: networkNamespaceForPod(pod),
+		Pid:     pidNamespaceForPod(pod),
+		User:    user,
+	}, nil
+}
+
+func (m *kubeGenericRuntimeManager) userNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, error) {
+	config, err := m.GetRuntimeConfigInfo()
+	if err != nil {
+		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("user namespace can't be enabled: %v", err)
 	}
-	if userns == "enabled" || userns == "disabled" {
+
+	runtimeEnabled := config != nil && config.IsUserNamespaceSupported()
+	userns := getUserNsAnnotation(pod)
+
+	switch userns {
+	case UsernsRuntimeDefault:
+		if runtimeEnabled && !m.enableHostUserNamespace(pod) {
+			return runtimeapi.NamespaceMode_POD, nil
+		}
+		return runtimeapi.NamespaceMode_NODE, nil
+	case UsernsPod:
+		if m.enableHostUserNamespace(pod) || !runtimeEnabled {
+			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("user namespace can't be enabled")
+		}
+		return runtimeapi.NamespaceMode_POD, nil
+	case UsernsNode:
+		return runtimeapi.NamespaceMode_NODE, nil
+	default:
+		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("invalid value for user ns annotation")
+	}
+}
+
+// enableHostUserNamespace determines if the host user namespace should be used by the container runtime.
+// Returns true if the pod is using a host pid, pic, or network namespace, the pod is using a non-namespaced
+// capability, the pod contains a privileged container, or the pod has a host path volume.
+//
+// NOTE: when if a container shares any namespace with another container it must also share the user namespace
+// or it will not have the correct capabilities in the namespace.  This means that host user namespace
+// is enabled per pod, not per container.
+func (m *kubeGenericRuntimeManager) enableHostUserNamespace(pod *v1.Pod) bool {
+	if kubecontainer.HasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
+		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || m.hasHostMountPVC(pod) {
 		return true
 	}
 	return false
 }
 
-func userNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if !userNamespaceDefinedForPod(pod) {
-		return runtimeapi.NamespaceMode_NODE
+// hasNonNamespacedCapability returns true if MKNOD, SYS_TIME, or SYS_MODULE is requested for any container.
+func hasNonNamespacedCapability(pod *v1.Pod) bool {
+	for _, c := range pod.Spec.Containers {
+		if c.SecurityContext != nil && c.SecurityContext.Capabilities != nil {
+			for _, cap := range c.SecurityContext.Capabilities.Add {
+				if cap == "MKNOD" || cap == "SYS_TIME" || cap == "SYS_MODULE" {
+					return true
+				}
+			}
+		}
 	}
-	userns, _ := pod.Annotations["alpha.kinvolk.io/userns"]
-	if userns == "enabled" {
-		return runtimeapi.NamespaceMode_POD
-	} else {
-		return runtimeapi.NamespaceMode_NODE
+
+	return false
+}
+
+// hasHostVolume returns true if the pod spec has a HostPath volume.
+func hasHostVolume(pod *v1.Pod) bool {
+	for _, v := range pod.Spec.Volumes {
+		if v.HostPath != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true.
+func hasHostNamespace(pod *v1.Pod) bool {
+	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID
+}
+
+// hasHostMountPVC returns true if a PVC is referencing a HostPath volume.
+func (m *kubeGenericRuntimeManager) hasHostMountPVC(pod *v1.Pod) bool {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			pvc, err := m.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+			if err != nil {
+				klog.Warningf("unable to retrieve pvc %s:%s - %v", pod.Namespace, volume.PersistentVolumeClaim.ClaimName, err)
+				continue
+			}
+			if pvc != nil {
+				referencedVolume, err := m.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+				if err != nil {
+					klog.Warningf("unable to retrieve pv %s - %v", pvc.Spec.VolumeName, err)
+					continue
+				}
+				if referencedVolume != nil && referencedVolume.Spec.HostPath != nil {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// getUserNsAnnotation returns the value of the user namespace annotation
+func getUserNsAnnotation(pod *v1.Pod) UsernsAnn {
+	userns, ok := pod.Annotations[kivolkUsernsAnn]
+	if !ok {
+		return UsernsRuntimeDefault
+	}
+
+	switch userns {
+	case "pod":
+		return UsernsPod
+	case "node":
+		return UsernsNode
+	case "runtimeDefault":
+		return UsernsRuntimeDefault
+	default:
+		return UsernsInvalid
 	}
 }
 
-// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
-// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
-	return &runtimeapi.NamespaceOption{
-		Ipc:     ipcNamespaceForPod(pod),
-		Network: networkNamespaceForPod(pod),
-		Pid:     pidNamespaceForPod(pod),
-		User:    userNamespaceForPod(pod),
+// chownAllFilesAt traverses the directory tree at the give path and chowns the paths to adjust for the remapped usernamespaces
+func (m *kubeGenericRuntimeManager) chownAllFilesAt(dir string) error {
+	var files []string
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+	klog.V(5).Infof("Chowned paths %v", files)
+	for _, file := range files {
+		//_, fileGID, err := kl.getOwnerIDsFor(file)
+		//if err != nil {
+		//	return fmt.Errorf("error in getting volume path owner UID/GID: %v", err)
+		//}
+		//if fileGID != 0 {
+		//	klog.V(5).Infof("GID, %v, for path %v is not equal to 0. Skipping chowing assuming it to be FsGroup GID ", fileGID, file)
+		//	continue
+		//}
+		containerUID := uint32(0)
+		containerGID := uint32(0)
+		uid, err := m.GetHostUID(containerUID)
+		if err != nil {
+			return fmt.Errorf("Failed to get remapped host UID corresponding to UID 0 in container namespace: %v", err)
+		}
+		gid, err := m.GetHostGID(containerGID)
+		if err != nil {
+			return fmt.Errorf("Failed to get remapped host GID corresponding to GID 0 in container namespace: %v", err)
+		}
+		klog.V(5).Infof("Remapped default uid %d, default gid %d path %s", uid, gid, file)
+		err = os.Chown(file, int(uid), int(gid))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
