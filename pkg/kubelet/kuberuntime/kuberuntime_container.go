@@ -238,9 +238,6 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		StdinOnce:   container.StdinOnce,
 		Tty:         container.TTY,
 	}
-	if opts.EnableHostUserNamespace {
-		//TODO(Alban): should we add the annotation here?
-	}
 
 	// set platform specific configurations.
 	if err := m.applyPlatformSpecificContainerConfig(config, container, pod, uid, username); err != nil {

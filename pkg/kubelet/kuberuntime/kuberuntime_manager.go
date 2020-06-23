@@ -24,6 +24,8 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,6 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
@@ -64,6 +67,9 @@ const (
 
 	// Kinvolk alpha annotation for sidecars
 	kinvolkSidecarAnn = "alpha.kinvolk.io/sidecar"
+
+	// Kinvolk alpha annotation for user namespaces
+	kivolkUsernsAnn = "alpha.kinvolk.io/userns"
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
@@ -139,7 +145,11 @@ type kubeGenericRuntimeManager struct {
 	logReduction *logreduction.LogReduction
 
 	// cache of runtime configuration eg, user-namespace configuration
-	runtimeConfig *kubecontainer.RuntimeConfigInfo
+	runtimeConfig       *kubecontainer.RuntimeConfigInfo
+	runtimeConfigCached bool
+
+	// client to talk to the api server
+	kubeClient clientset.Interface
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -178,6 +188,7 @@ func NewKubeGenericRuntimeManager(
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
 	runtimeClassManager *runtimeclass.Manager,
+	kubeClient clientset.Interface,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -197,6 +208,7 @@ func NewKubeGenericRuntimeManager(
 		legacyLogProvider:   legacyLogProvider,
 		runtimeClassManager: runtimeClassManager,
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		kubeClient:          kubeClient,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
@@ -316,17 +328,25 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 }
 
 // GetRuntimeConfigInfo returns runtime configuration details cached at runtime manager
+// nil is returned if the runtime doesn't support this method.
 func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
-	if m.runtimeConfig != nil {
+	if m.runtimeConfigCached  {
 		return m.runtimeConfig, nil
 	}
 	runtimeConfig, err := m.runtimeService.GetRuntimeConfigInfo()
 	if err != nil {
+		// Do not try to call if again if this is not supported in the runtime.
+		if status, ok := status.FromError(err); ok && status.Code() == codes.Unimplemented {
+			klog.V(4).Infof("Container runtime doesn't support GetRuntimeConfigInfo()")
+			m.runtimeConfigCached = true
+			return nil, nil
+		}
 		return nil, fmt.Errorf("container runtime info get failed: %v", err)
 	}
 	ci := toKubeRuntimeConfig(runtimeConfig)
 	klog.V(4).Infof("Container runtime config info: %v", ci)
 	m.runtimeConfig = ci
+	m.runtimeConfigCached = true
 
 	return ci, nil
 }
@@ -1088,6 +1108,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		klog.Error(message)
 		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, message)
 		return
+	}
+
+	if userns, err := m.userNamespaceForPod(pod); err == nil && userns == runtimeapi.NamespaceMode_POD {
+		m.chownAllFilesAt(m.runtimeHelper.GetPodVolumesDir(pod.UID))
 	}
 
 	// Helper containing boilerplate common to starting all types of containers.

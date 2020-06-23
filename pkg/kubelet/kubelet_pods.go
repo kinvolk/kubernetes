@@ -492,9 +492,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
-	klog.V(5).Infof("opts.EnableHostUserNamespace %v for pod %s", opts.EnableHostUserNamespace, pod.Name)
-
 	return opts, cleanupAction, nil
 }
 
@@ -1723,75 +1720,4 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 		// again try to delete these unwanted pod cgroups
 		go pcm.Destroy(val)
 	}
-}
-
-// enableHostUserNamespace determines if the host user namespace should be used by the container runtime.
-// Returns true if the pod is using a host pid, pic, or network namespace, the pod is using a non-namespaced
-// capability, the pod contains a privileged container, or the pod has a host path volume.
-//
-// NOTE: when if a container shares any namespace with another container it must also share the user namespace
-// or it will not have the correct capabilities in the namespace.  This means that host user namespace
-// is enabled per pod, not per container.
-func (kl *Kubelet) enableHostUserNamespace(pod *v1.Pod) bool {
-	if kubecontainer.HasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
-		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || kl.hasHostMountPVC(pod) {
-		return true
-	}
-	return false
-}
-
-// hasNonNamespacedCapability returns true if MKNOD, SYS_TIME, or SYS_MODULE is requested for any container.
-func hasNonNamespacedCapability(pod *v1.Pod) bool {
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext != nil && c.SecurityContext.Capabilities != nil {
-			for _, cap := range c.SecurityContext.Capabilities.Add {
-				if cap == "MKNOD" || cap == "SYS_TIME" || cap == "SYS_MODULE" {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// hasHostVolume returns true if the pod spec has a HostPath volume.
-func hasHostVolume(pod *v1.Pod) bool {
-	for _, v := range pod.Spec.Volumes {
-		if v.HostPath != nil {
-			return true
-		}
-	}
-	return false
-}
-
-// hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true or userNamespaceRemapping is set to false.
-func hasHostNamespace(pod *v1.Pod) bool {
-	// TODO(Alban): use helper function and constants
-	userns, _ := pod.Annotations["alpha.kinvolk.io/userns"]
-	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID || userns != "enabled"
-}
-
-// hasHostMountPVC returns true if a PVC is referencing a HostPath volume.
-func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
-	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim != nil {
-			pvc, err := kl.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
-			if err != nil {
-				klog.Warningf("unable to retrieve pvc %s:%s - %v", pod.Namespace, volume.PersistentVolumeClaim.ClaimName, err)
-				continue
-			}
-			if pvc != nil {
-				referencedVolume, err := kl.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
-				if err != nil {
-					klog.Warningf("unable to retrieve pv %s - %v", pvc.Spec.VolumeName, err)
-					continue
-				}
-				if referencedVolume != nil && referencedVolume.Spec.HostPath != nil {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
