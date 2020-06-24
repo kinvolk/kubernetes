@@ -4,7 +4,7 @@ metadata:
   name: pod-userns
   namespace: default
   annotations:
-    alpha.kinvolk.io/userns: "enabled"
+    alpha.kinvolk.io/userns: "pod"
 spec:
   restartPolicy: Never
   containers:

@@ -4,7 +4,7 @@ metadata:
   name: pod-simple
   namespace: default
   annotations:
-    alpha.kinvolk.io/userns: "disabled"
+    alpha.kinvolk.io/userns: "node"
 spec:
   restartPolicy: Never
   containers:
