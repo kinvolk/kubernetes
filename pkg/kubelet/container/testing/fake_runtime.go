@@ -52,7 +52,7 @@ type FakeRuntime struct {
 	StartedContainers    []string
 	KilledContainers     []string
 	RuntimeStatus        *kubecontainer.RuntimeStatus
-	RuntimeConfigInfo    *RuntimeConfigInfo
+	RuntimeConfigInfo    *kubecontainer.RuntimeConfigInfo
 	RuntimeConfigInfoErr error
 	VersionInfo          string
 	APIVersionInfo       string
@@ -60,8 +60,6 @@ type FakeRuntime struct {
 	Err                  error
 	InspectErr           error
 	StatusErr            error
-	RemappedUID          int
-	RemappedGID          int
 }
 
 const FakeHost = "localhost:12345"
@@ -211,20 +209,12 @@ func (f *FakeRuntime) Status() (*kubecontainer.RuntimeStatus, error) {
 	return f.RuntimeStatus, f.StatusErr
 }
 
-func (f *FakeRuntime) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
+func (f *FakeRuntime) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetRuntimeConfigInfo")
 	return f.RuntimeConfigInfo, f.RuntimeConfigInfoErr
-}
-
-func (f *FakeRuntime) GetRemappedIds() (int, int) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetRemappedIds")
-	return f.RemappedUID, f.RemappedGID
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*kubecontainer.Pod, error) {

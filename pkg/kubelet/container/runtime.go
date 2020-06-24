@@ -118,9 +118,9 @@ type Runtime interface {
 	// GetRuntimeConfigInfo returns runtime's configuration details, eg: if user-namespaces are enabled or not
 	GetRuntimeConfigInfo() (*RuntimeConfigInfo, error)
 	// GetHostUID returns the uid from the host usernamespace that is mapped to the container usernamespace uid, containerUID
-	GetHostUID(containerUID uint32) (uint32, error)
+	//GetHostUID(containerUID uint32) (uint32, error)
 	// GetHostGID returns the gid from the host usernamespace that is mapped to the container usernamespace gid, containerGID
-	GetHostGID(containerGID uint32) (uint32, error)
+	//GetHostGID(containerGID uint32) (uint32, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -485,6 +485,9 @@ type UserNSMapping struct {
 
 // IsUserNamespaceEnabled returns true if user-namespace feature is enabled at runtime
 func (c *RuntimeConfigInfo) IsUserNamespaceEnabled() bool {
+	if len(c.UserNamespaceConfig.UidMappings) == 0 {
+		return false
+	}
 	if len(c.UserNamespaceConfig.UidMappings) == 1 &&
 		c.UserNamespaceConfig.UidMappings[0].HostID == uint32(0) && c.UserNamespaceConfig.UidMappings[0].Size == uint32(4294967295) {
 		return false
@@ -494,6 +497,9 @@ func (c *RuntimeConfigInfo) IsUserNamespaceEnabled() bool {
 
 // IsUserNamespaceSupported returns true if user-namespace feature is supported at runtime
 func (c *RuntimeConfigInfo) IsUserNamespaceSupported() bool {
+	if len(c.UserNamespaceConfig.UidMappings) == 0 {
+		return false
+	}
 	if len(c.UserNamespaceConfig.UidMappings) == 1 &&
 		c.UserNamespaceConfig.UidMappings[0].HostID == uint32(0) && c.UserNamespaceConfig.UidMappings[0].Size == uint32(0) {
 		return false

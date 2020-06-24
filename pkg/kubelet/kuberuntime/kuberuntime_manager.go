@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
+
 )
 
 const (
@@ -339,9 +340,9 @@ func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.Runti
 		if status, ok := status.FromError(err); ok && status.Code() == codes.Unimplemented {
 			klog.V(4).Infof("Container runtime doesn't support GetRuntimeConfigInfo()")
 			m.runtimeConfigCached = true
-			return nil, nil
+			return toKubeRuntimeConfig(nil), nil
 		}
-		return nil, fmt.Errorf("container runtime info get failed: %v", err)
+		return toKubeRuntimeConfig(nil), fmt.Errorf("container runtime info get failed: %v", err)
 	}
 	ci := toKubeRuntimeConfig(runtimeConfig)
 	klog.V(4).Infof("Container runtime config info: %v", ci)
@@ -1110,9 +1111,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		return
 	}
 
-	if userns, err := m.userNamespaceForPod(pod); err == nil && userns == runtimeapi.NamespaceMode_POD {
-		m.chownAllFilesAt(m.runtimeHelper.GetPodVolumesDir(pod.UID))
-	}
+	//if userns, err := m.userNamespaceForPod(pod); err == nil && userns == runtimeapi.NamespaceMode_POD {
+	//	m.chownAllFilesAt(m.runtimeHelper.GetPodVolumesDir(pod.UID))
+	//}
 
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a label used to describe this type of container in log messages,

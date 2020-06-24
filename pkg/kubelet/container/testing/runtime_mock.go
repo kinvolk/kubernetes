@@ -67,19 +67,19 @@ func (r *Mock) Status() (*kubecontainer.RuntimeStatus, error) {
 	return args.Get(0).(*kubecontainer.RuntimeStatus), args.Error(0)
 }
 
-func (r *Mock) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
+func (r *Mock) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
 	args := r.Called()
-	return args.Get(0).(*RuntimeConfigInfo), args.Error(1)
+	return args.Get(0).(*kubecontainer.RuntimeConfigInfo), args.Error(1)
 }
 
-func (r *Mock) GetHostUID(containerUID int) (int, error) {
+func (r *Mock) GetHostUID(containerUID uint32) (uint32, error) {
 	args := r.Called(containerUID)
-	return args.Get(0).(int), args.Error(1)
+	return args.Get(0).(uint32), args.Error(1)
 }
 
-func (r *Mock) GetHostGID(containerGID int) (int, error) {
+func (r *Mock) GetHostGID(containerGID uint32) (uint32, error) {
 	args := r.Called(containerGID)
-	return args.Get(0).(int), args.Error(1)
+	return args.Get(0).(uint32), args.Error(1)
 }
 
 func (r *Mock) GetPods(all bool) ([]*kubecontainer.Pod, error) {

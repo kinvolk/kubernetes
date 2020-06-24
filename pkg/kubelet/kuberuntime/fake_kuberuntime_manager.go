@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
+
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 const (
@@ -89,6 +91,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		seccompProfileRoot:  fakeSeccompProfileRoot,
 		internalLifecycle:   cm.NewFakeInternalContainerLifecycle(),
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		kubeClient:          &fake.Clientset{},
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)

@@ -282,6 +282,13 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 }
 
 func TestNamespacesForPod(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	// Runtime doesn't support user namespaces
+	m.runtimeConfigCached = true
+	m.runtimeConfig = nil
+
 	for desc, test := range map[string]struct {
 		input    *v1.Pod
 		expected *runtimeapi.NamespaceOption
@@ -292,6 +299,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"v1.Pod default namespaces": {
@@ -300,6 +308,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"Host Namespaces": {
@@ -314,6 +323,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_NODE,
 				Network: runtimeapi.NamespaceMode_NODE,
 				Pid:     runtimeapi.NamespaceMode_NODE,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"Shared Process Namespace (feature enabled)": {
@@ -326,6 +336,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_POD,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"Shared Process Namespace, redundant flag (feature enabled)": {
@@ -338,11 +349,232 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 	} {
 		t.Logf("TestCase: %s", desc)
-		actual := namespacesForPod(test.input)
+		actual, err := m.namespacesForPod(test.input)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expected, actual)
 	}
+}
+
+func TestUserNamespaceForPod(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	// Runtime supports user namespaces
+	uidMappings := []*kubecontainer.UserNSMapping{
+		&kubecontainer.UserNSMapping{
+			ContainerID: 0,
+			HostID: 1000,
+			Size: 65536,
+		},
+	}
+	userNSConfig := kubecontainer.UserNamespaceConfigInfo{
+		UidMappings: uidMappings,
+		GidMappings: uidMappings,
+	}
+	m.runtimeConfigCached = true
+	// TODO: how to avoid creating a real class and mocking it instead?
+	m.runtimeConfig = &kubecontainer.RuntimeConfigInfo{UserNamespaceConfig: userNSConfig}
+
+	//trueObj := true
+
+	for desc, test := range map[string]struct {
+		input         *v1.Pod
+		expected      runtimeapi.NamespaceMode
+		expectedError bool
+	}{
+		"nil pod -> default v1 namespaces": {
+			nil,
+			runtimeapi.NamespaceMode_POD,
+			false,
+		},
+		"v1.Pod default namespaces": {
+			&v1.Pod{},
+			runtimeapi.NamespaceMode_POD,
+			false,
+		},
+		"User ns node mode": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "node",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Host Namespaces": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					HostIPC:     true,
+					HostNetwork: true,
+					HostPID:     true,
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Host Namespaces and user ns pod mode": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					HostIPC:     true,
+					HostNetwork: true,
+					HostPID:     true,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Privileged container": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Privileged: &[]bool{true}[0],
+							},
+						},
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Privileged container user ns pod mode": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Privileged: &[]bool{true}[0],
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Non namespaced capability": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Capabilities: &v1.Capabilities {
+									Add: []v1.Capability {
+										"MKNOD", "SYS_TIME", "SYS_MODULE",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Non namespaced capability with userns pod": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Capabilities: &v1.Capabilities {
+									Add: []v1.Capability {
+										"MKNOD", "SYS_TIME", "SYS_MODULE",
+									},
+								},
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Host path volume": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume {
+						v1.Volume {
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/tmp/anything",
+								},
+							},
+						},
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Host path volume with user ns pod": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume {
+						v1.Volume {
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/tmp/anything",
+								},
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Bad userns annotation": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "itsbad",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+	} {
+		t.Logf("TestCase: %s", desc)
+		actual, err := m.userNamespaceForPod(test.input)
+		if test.expectedError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, actual)
+		}
+	}
+}
+
+func TestToKubeRuntimeStatus(t *testing.T) {
+
 }

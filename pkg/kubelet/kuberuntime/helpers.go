@@ -214,16 +214,6 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
-// getRootIDMapping returns {U/G}ID mapping corresponding to ID '0' in container usernamespace
-func getRootIDMapping(idMappings []*runtimeapi.LinuxIDMapping) *runtimeapi.LinuxIDMapping {
-	for _, mapping := range idMappings {
-		if mapping.ContainerId == uint32(0) {
-			return mapping
-		}
-	}
-	return nil
-}
-
 // toKubeRuntimeConfig converts the runtimeapi.ActiveRuntimeConfig to kubecontainer.RuntimeConfigInfo
 func toKubeRuntimeConfig(config *runtimeapi.ActiveRuntimeConfig) *kubecontainer.RuntimeConfigInfo {
 	usernsConfig := config.GetUserNamespaceConfig()
@@ -335,7 +325,7 @@ func (m *kubeGenericRuntimeManager) userNamespaceForPod(pod *v1.Pod) (runtimeapi
 		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("user namespace can't be enabled: %v", err)
 	}
 
-	runtimeEnabled := config != nil && config.IsUserNamespaceSupported()
+	runtimeEnabled := config != nil && config.IsUserNamespaceSupported() && config.IsUserNamespaceEnabled()
 	userns := getUserNsAnnotation(pod)
 
 	switch userns {
@@ -364,6 +354,9 @@ func (m *kubeGenericRuntimeManager) userNamespaceForPod(pod *v1.Pod) (runtimeapi
 // or it will not have the correct capabilities in the namespace.  This means that host user namespace
 // is enabled per pod, not per container.
 func (m *kubeGenericRuntimeManager) enableHostUserNamespace(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
 	if kubecontainer.HasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
 		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || m.hasHostMountPVC(pod) {
 		return true
@@ -427,6 +420,9 @@ func (m *kubeGenericRuntimeManager) hasHostMountPVC(pod *v1.Pod) bool {
 
 // getUserNsAnnotation returns the value of the user namespace annotation
 func getUserNsAnnotation(pod *v1.Pod) UsernsAnn {
+	if pod == nil {
+		return UsernsRuntimeDefault
+	}
 	userns, ok := pod.Annotations[kivolkUsernsAnn]
 	if !ok {
 		return UsernsRuntimeDefault
