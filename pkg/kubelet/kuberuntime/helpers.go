@@ -321,7 +321,7 @@ func userNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	}
 	userns, _ := pod.Annotations["alpha.kinvolk.io/userns"]
 	if userns == "enabled" {
-		return runtimeapi.NamespaceMode_NODE_WIDE_REMAPPED
+		return runtimeapi.NamespaceMode_POD
 	} else {
 		return runtimeapi.NamespaceMode_NODE
 	}
