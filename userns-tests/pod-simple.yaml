@@ -12,4 +12,17 @@ spec:
     image: busybox
     command: ["sh"]
     args: ["-c", "sleep infinity"]
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/userns-cm/content
+    env:
+      - name: SPECIAL_LEVEL_KEY
+        valueFrom:
+          configMapKeyRef:
+            name: userns-cm
+            key: content
+  volumes:
+    - name: config-volume
+      configMap:
+        name: userns-cm
 

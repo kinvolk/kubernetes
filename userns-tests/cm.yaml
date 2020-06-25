@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: userns-cm
+  namespace: default
+data:
+  content: '"This is a ConfigMap"'
