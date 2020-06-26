@@ -319,6 +319,14 @@ func (m *kubeGenericRuntimeManager) namespacesForPod(pod *v1.Pod) (*runtimeapi.N
 	}, nil
 }
 
+func (m *kubeGenericRuntimeManager) IsUserNamespaceForPodGood(pod *v1.Pod) bool {
+	if _, err := m.userNamespaceForPod(pod); err != nil {
+		return false
+	}
+
+	return true
+}
+
 func (m *kubeGenericRuntimeManager) userNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, error) {
 	config, err := m.GetRuntimeConfigInfo()
 	if err != nil {

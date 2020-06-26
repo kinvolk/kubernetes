@@ -121,6 +121,8 @@ type Runtime interface {
 	//GetHostUID(containerUID uint32) (uint32, error)
 	// GetHostGID returns the gid from the host usernamespace that is mapped to the container usernamespace gid, containerGID
 	//GetHostGID(containerGID uint32) (uint32, error)
+
+	IsUserNamespaceForPodGood(pod *v1.Pod) bool
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
