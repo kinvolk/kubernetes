@@ -1111,9 +1111,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		return
 	}
 
-	//if userns, err := m.userNamespaceForPod(pod); err == nil && userns == runtimeapi.NamespaceMode_POD {
-	//	m.chownAllFilesAt(m.runtimeHelper.GetPodVolumesDir(pod.UID))
-	//}
+	if userns, err := m.userNamespaceForPod(pod); err == nil && userns == runtimeapi.NamespaceMode_POD {
+		m.chownAllFilesAt(m.runtimeHelper.GetPodVolumesDir(pod.UID))
+	}
 
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a label used to describe this type of container in log messages,

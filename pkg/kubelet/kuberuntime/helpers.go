@@ -453,14 +453,6 @@ func (m *kubeGenericRuntimeManager) chownAllFilesAt(dir string) error {
 	}
 	klog.V(5).Infof("Chowned paths %v", files)
 	for _, file := range files {
-		//_, fileGID, err := kl.getOwnerIDsFor(file)
-		//if err != nil {
-		//	return fmt.Errorf("error in getting volume path owner UID/GID: %v", err)
-		//}
-		//if fileGID != 0 {
-		//	klog.V(5).Infof("GID, %v, for path %v is not equal to 0. Skipping chowing assuming it to be FsGroup GID ", fileGID, file)
-		//	continue
-		//}
 		containerUID := uint32(0)
 		containerGID := uint32(0)
 		uid, err := m.GetHostUID(containerUID)
@@ -472,7 +464,7 @@ func (m *kubeGenericRuntimeManager) chownAllFilesAt(dir string) error {
 			return fmt.Errorf("Failed to get remapped host GID corresponding to GID 0 in container namespace: %v", err)
 		}
 		klog.V(5).Infof("Remapped default uid %d, default gid %d path %s", uid, gid, file)
-		err = os.Chown(file, int(uid), int(gid))
+		err = os.Lchown(file, int(uid), int(gid))
 		if err != nil {
 			return err
 		}
