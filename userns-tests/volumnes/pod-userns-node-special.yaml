@@ -1,0 +1,26 @@
+# Pod user with userns set to "node" mode and special features.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-userns-node-special
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "node"
+spec:
+#  securityContext:
+#    runAsUser: 1000
+  restartPolicy: Never
+  containers:
+  - name: pod-userns
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/userns-cm/content
+  volumes:
+    - name: config-volume
+      configMap:
+        name: test-config-map
+  # TODO: add more special features here.
+  hostNetwork: true

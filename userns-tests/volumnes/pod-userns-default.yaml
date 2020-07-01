@@ -1,0 +1,22 @@
+# Pod without the userns annotation and without any feature that would cause
+# the user namespace support to be disable if available in the runtime.
+# User namespace should be used if available in the runtime.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-userns-default
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+  - name: pod-simple
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/userns-cm/content
+  volumes:
+    - name: config-volume
+      configMap:
+        name: test-config-map
