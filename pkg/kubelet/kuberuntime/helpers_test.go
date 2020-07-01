@@ -282,6 +282,13 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 }
 
 func TestNamespacesForPod(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	// Runtime doesn't support user namespaces
+	m.runtimeConfigCached = true
+	m.runtimeConfig = nil
+
 	for desc, test := range map[string]struct {
 		input    *v1.Pod
 		expected *runtimeapi.NamespaceOption
@@ -292,6 +299,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"v1.Pod default namespaces": {
@@ -300,6 +308,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"Host Namespaces": {
@@ -314,6 +323,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_NODE,
 				Network: runtimeapi.NamespaceMode_NODE,
 				Pid:     runtimeapi.NamespaceMode_NODE,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"Shared Process Namespace (feature enabled)": {
@@ -326,6 +336,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_POD,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 		"Shared Process Namespace, redundant flag (feature enabled)": {
@@ -338,11 +349,13 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_NODE,
 			},
 		},
 	} {
 		t.Logf("TestCase: %s", desc)
-		actual := namespacesForPod(test.input)
+		actual, err := m.namespacesForPod(test.input)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expected, actual)
 	}
 }

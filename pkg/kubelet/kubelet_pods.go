@@ -70,6 +70,18 @@ import (
 const (
 	managedHostsHeader                = "# Kubernetes-managed hosts file.\n"
 	managedHostsHeaderWithHostNetwork = "# Kubernetes-managed hosts file (host network).\n"
+
+	// Kinvolk alpha annotation for user namespaces
+	kivolkUsernsAnn = "alpha.kinvolk.io/userns"
+)
+
+type UsernsAnn int
+
+const (
+	UsernsInvalid UsernsAnn = iota
+	UsernsRuntimeDefault
+	UsernsPod
+	UsernsNode
 )
 
 // Get a list of pods that have data directories.
@@ -490,11 +502,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		} else {
 			opts.PodContainerDir = p
 		}
-	}
-
-	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
-	if kl.experimentalHostUserNamespaceDefaulting {
-		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
 	return opts, cleanupAction, nil
@@ -1735,6 +1742,9 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 // or it will not have the correct capabilities in the namespace.  This means that host user namespace
 // is enabled per pod, not per container.
 func (kl *Kubelet) enableHostUserNamespace(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
 	if kubecontainer.HasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
 		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || kl.hasHostMountPVC(pod) {
 		return true
@@ -1769,9 +1779,6 @@ func hasHostVolume(pod *v1.Pod) bool {
 
 // hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true.
 func hasHostNamespace(pod *v1.Pod) bool {
-	if pod.Spec.SecurityContext == nil {
-		return false
-	}
 	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID
 }
 
@@ -1797,4 +1804,53 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func (kl *Kubelet) UserNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, error) {
+	config, err := kl.containerRuntime.GetRuntimeConfigInfo()
+	if err != nil {
+		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("user namespace can't be enabled: %v", err)
+	}
+
+	runtimeEnabled := config != nil && config.IsUserNamespaceSupported() && config.IsUserNamespaceEnabled()
+	userns := getUserNsAnnotation(pod)
+
+	switch userns {
+	case UsernsRuntimeDefault:
+		if runtimeEnabled && !kl.enableHostUserNamespace(pod) {
+			return runtimeapi.NamespaceMode_POD, nil
+		}
+		return runtimeapi.NamespaceMode_NODE, nil
+	case UsernsPod:
+		if kl.enableHostUserNamespace(pod) || !runtimeEnabled {
+			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("user namespace can't be enabled")
+		}
+		return runtimeapi.NamespaceMode_POD, nil
+	case UsernsNode:
+		return runtimeapi.NamespaceMode_NODE, nil
+	default:
+		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("invalid value for user ns annotation")
+	}
+}
+
+// getUserNsAnnotation returns the value of the user namespace annotation
+func getUserNsAnnotation(pod *v1.Pod) UsernsAnn {
+	if pod == nil {
+		return UsernsRuntimeDefault
+	}
+	userns, ok := pod.Annotations[kivolkUsernsAnn]
+	if !ok {
+		return UsernsRuntimeDefault
+	}
+
+	switch userns {
+	case "pod":
+		return UsernsPod
+	case "node":
+		return UsernsNode
+	case "runtimeDefault":
+		return UsernsRuntimeDefault
+	default:
+		return UsernsInvalid
+	}
 }
