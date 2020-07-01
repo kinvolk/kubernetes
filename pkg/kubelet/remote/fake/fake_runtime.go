@@ -292,3 +292,13 @@ func (f *RemoteRuntime) ReopenContainerLog(ctx context.Context, req *kubeapi.Reo
 
 	return &kubeapi.ReopenContainerLogResponse{}, nil
 }
+
+// GetRuntimeConfigInfo returns configuration details of the container runtime
+func (f *RemoteRuntime) GetRuntimeConfigInfo(ctx context.Context, req *kubeapi.GetRuntimeConfigInfoRequest) (*kubeapi.GetRuntimeConfigInfoResponse, error) {
+	runtimeConfig, err := f.RuntimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.GetRuntimeConfigInfoResponse{RuntimeConfig: runtimeConfig}, nil
+}

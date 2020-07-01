@@ -24,6 +24,8 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
@@ -137,6 +139,10 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	// cache of runtime configuration eg, user-namespace configuration
+	runtimeConfig       *kubecontainer.RuntimeConfigInfo
+	runtimeConfigCached bool
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -310,6 +316,30 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 		return nil, err
 	}
 	return toKubeRuntimeStatus(status), nil
+}
+
+// GetRuntimeConfigInfo returns runtime configuration details cached at runtime manager
+// nil is returned if the runtime doesn't support this method.
+func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
+	if m.runtimeConfigCached  {
+		return m.runtimeConfig, nil
+	}
+	runtimeConfig, err := m.runtimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		// Do not try to call if again if this is not supported in the runtime.
+		if status, ok := status.FromError(err); ok && status.Code() == codes.Unimplemented {
+			klog.V(4).Infof("Container runtime doesn't support GetRuntimeConfigInfo()")
+			m.runtimeConfigCached = true
+			return toKubeRuntimeConfig(nil), nil
+		}
+		return toKubeRuntimeConfig(nil), fmt.Errorf("container runtime info get failed: %v", err)
+	}
+	ci := toKubeRuntimeConfig(runtimeConfig)
+	klog.V(4).Infof("Container runtime config info: %v", ci)
+	m.runtimeConfig = ci
+	m.runtimeConfigCached = true
+
+	return ci, nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
