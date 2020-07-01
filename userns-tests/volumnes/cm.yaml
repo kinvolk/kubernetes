@@ -1,9 +1,0 @@
-# This is a simple config map that will be mounted as volume in different
-# testing pods
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-config-map
-  namespace: default
-data:
-  content: '"This is a ConfigMap"'

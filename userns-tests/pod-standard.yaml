@@ -8,21 +8,9 @@ metadata:
   annotations:
     alpha.kinvolk.io/userns: "pod"
 spec:
-#  securityContext:
-#    runAsUser: 1000
   restartPolicy: Never
   containers:
   - name: pod-userns
     image: ubuntu
     command: ["sh"]
     args: ["-c", "sleep infinity"]
-    securityContext:
-      capabilities:
-        add: ["IPC_LOCK"]
-#    volumeMounts:
-#    - name: config-volume
-#      mountPath: /etc/userns-cm/content
-#  volumes:
-#    - name: config-volume
-#      configMap:
-#        name: test-config-map

@@ -1,18 +1,24 @@
-# Pod user with userns set to "pod" mode. Pod creation would fail if userns
-# not supported by runtime.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config-map
+  namespace: default
+data:
+  content: '"This is a ConfigMap"'
+---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-userns-pod
+  name: pod-with-configmap
   namespace: default
-  annotations:
-    alpha.kinvolk.io/userns: "pod"
 spec:
-#  securityContext:
-#    runAsUser: 1000
+  securityContext:
+    #runAsUser: 1000
+    #runAsGroup: 3000
+    fsGroup: 2000
   restartPolicy: Never
   containers:
-  - name: pod-userns
+  - name: pod-with-configmap
     image: busybox
     command: ["sh"]
     args: ["-c", "sleep infinity"]
@@ -23,3 +29,4 @@ spec:
     - name: config-volume
       configMap:
         name: test-config-map
+        defaultMode: 0400
