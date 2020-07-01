@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -282,12 +283,99 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 
+func userNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, *runtimeapi.LinuxUserNamespaceConfig) {
+	mapping := getRemapping(pod)
+	if mapping == nil {
+		return runtimeapi.NamespaceMode_NODE, mapping
+	} else {
+		return runtimeapi.NamespaceMode_POD, mapping
+	}
+}
+
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
 func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
-	return &runtimeapi.NamespaceOption{
+
+	userNs, mapping := userNamespaceForPod(pod)
+
+	opts := &runtimeapi.NamespaceOption{
 		Ipc:     ipcNamespaceForPod(pod),
 		Network: networkNamespaceForPod(pod),
 		Pid:     pidNamespaceForPod(pod),
+		User:    userNs,
+
 	}
+	if userNs == runtimeapi.NamespaceMode_POD {
+		opts.Mapping = mapping
+	}
+	return opts
+}
+
+func getRemapping(pod *v1.Pod) *runtimeapi.LinuxUserNamespaceConfig {
+	container_id, host_id, size, ok := getIds(pod)
+	if !ok {
+		return nil
+	}
+
+	return &runtimeapi.LinuxUserNamespaceConfig{
+		UidMappings: []*runtimeapi.LinuxIDMapping{
+			&runtimeapi.LinuxIDMapping{
+				ContainerId: container_id,
+				HostId:      host_id,
+				Size_:       size,
+			},
+		},
+		GidMappings: []*runtimeapi.LinuxIDMapping{
+			&runtimeapi.LinuxIDMapping{
+				ContainerId: container_id,
+				HostId:      host_id,
+				Size_:       size,
+			},
+		},
+	}
+}
+
+func getIds(pod *v1.Pod) (uint32, uint32, uint32, bool) {
+	mapping, ok := pod.Annotations["alpha.kinvolk.io/mapping"]
+	if !ok {
+		return 0,0,0, false
+	}
+
+	var ret uint64
+
+	splits := strings.Split(mapping, ":")
+
+	ret, _ = strconv.ParseUint(splits[0], 10, 32)
+	container_id := uint32(ret)
+
+	ret, _ = strconv.ParseUint(splits[1], 10, 32)
+	host_id := uint32(ret)
+
+	ret, _ = strconv.ParseUint(splits[2], 10, 32)
+	size := uint32(ret)
+
+	return container_id, host_id, size, true
+}
+
+// chownAllFilesAt traverses the directory tree at the give path and chowns the paths to adjust for the remapped usernamespaces
+func (m *kubeGenericRuntimeManager) chownAllFilesAt(pod *v1.Pod, dir string) error {
+	var files []string
+
+	_, host_id, _, _ := getIds(pod)
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	klog.V(5).Infof("Chowned paths %v", files)
+	for _, file := range files {
+		err = os.Lchown(file, int(host_id), int(host_id))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

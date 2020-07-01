@@ -502,11 +502,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
-	if kl.experimentalHostUserNamespaceDefaulting {
-		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
-	}
-
 	return opts, cleanupAction, nil
 }
 
@@ -1909,6 +1904,10 @@ func hasNonNamespacedCapability(pod *v1.Pod) bool {
 
 // hasHostVolume returns true if the pod spec has a HostPath volume.
 func hasHostVolume(pod *v1.Pod) bool {
+	if pod.Spec.SecurityContext == nil {
+		return false
+	}
+
 	for _, v := range pod.Spec.Volumes {
 		if v.HostPath != nil {
 			return true
@@ -1919,9 +1918,6 @@ func hasHostVolume(pod *v1.Pod) bool {
 
 // hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true.
 func hasHostNamespace(pod *v1.Pod) bool {
-	if pod.Spec.SecurityContext == nil {
-		return false
-	}
 	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID
 }
 

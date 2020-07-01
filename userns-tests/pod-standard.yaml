@@ -1,0 +1,32 @@
+# Pod user with userns set to "pod" mode. Pod creation would fail if userns
+# not supported by runtime.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-standard
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "pod"
+    alpha.kinvolk.io/mapping: "0:800000:65536"
+spec:
+  securityContext:
+    # Uncomment the following lines to get different behaviours
+    #runAsUser: 131000
+    #runAsGroup: 3000
+    #fsGroup: 2000
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+#    volumeMounts:
+#    - mountPath: /test-pd
+#      name: test-volume
+#  volumes:
+#  - name: test-volume
+#    hostPath:
+#      # directory location on host
+#      path: /tmp/volumetest
+#      # this field is optional
+#      type: Directory

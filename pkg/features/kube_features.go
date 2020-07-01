@@ -39,14 +39,6 @@ const (
 	// beta: v1.11
 	DynamicKubeletConfig featuregate.Feature = "DynamicKubeletConfig"
 
-	// owner: @pweil-
-	// alpha: v1.5
-	//
-	// Default userns=host for containers that are using other host namespaces, host mounts, the pod
-	// contains a privileged container, or specific non-namespaced capabilities (MKNOD, SYS_MODULE,
-	// SYS_TIME). This should only be enabled if user namespace remapping is enabled in the docker daemon.
-	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
-
 	// owner: @jiayingz
 	// beta: v1.10
 	//
@@ -657,7 +649,6 @@ func init() {
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	AppArmor:             {Default: true, PreRelease: featuregate.Beta},
 	DynamicKubeletConfig: {Default: true, PreRelease: featuregate.Beta},
-	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 	DevicePlugins:                  {Default: true, PreRelease: featuregate.Beta},
 	TaintBasedEvictions:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
