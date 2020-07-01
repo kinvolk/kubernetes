@@ -204,7 +204,7 @@ message Mount {
 }
 
 // A NamespaceMode describes the intended namespace configuration for each
-// of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
+// of the namespaces (Network, PID, IPC, User) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
 enum NamespaceMode {
     // A POD namespace is common to all containers in a pod.
@@ -236,6 +236,11 @@ message NamespaceOption {
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // User namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped user namespace in the Kubernetes API.
+    // NODE is the default value. Kubelet will set it to POD if pod spec indicates to use user-namespace remapping
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode user = 4;
 }
 
 // Int64Value is the wrapper of int64.
