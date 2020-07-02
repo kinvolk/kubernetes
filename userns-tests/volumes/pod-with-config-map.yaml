@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config-map
+  namespace: default
+data:
+  content: '"This is a ConfigMap"'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-configmap
+  namespace: default
+spec:
+  securityContext:
+    # Uncomment the following lines to get different behaviours
+    #runAsUser: 1000
+    #runAsGroup: 3000
+    #fsGroup: 2000
+  restartPolicy: Never
+  containers:
+  - name: pod-with-configmap
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/userns-cm/content
+  volumes:
+    - name: config-volume
+      configMap:
+        name: test-config-map
+        defaultMode: 0400

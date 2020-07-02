@@ -1,0 +1,16 @@
+# Pod user with userns set to "pod" mode. Pod creation would fail if userns
+# not supported by runtime.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-standard
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "pod"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]

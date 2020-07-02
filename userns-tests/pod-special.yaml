@@ -1,0 +1,17 @@
+# Pod user with userns set to "pod" mode and special features.
+# The pod creation will fail.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-special
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "pod"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+  hostNetwork: true

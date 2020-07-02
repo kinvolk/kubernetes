@@ -1,0 +1,15 @@
+# Pod without the userns annotation and with special features that would cause
+# the user namespace support to be disabled.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-special
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
+  hostNetwork: true

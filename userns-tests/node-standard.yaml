@@ -1,0 +1,15 @@
+# Pod user with userns set to "node" mode.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-standard
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "node"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]
