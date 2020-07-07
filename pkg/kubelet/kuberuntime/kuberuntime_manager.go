@@ -326,7 +326,7 @@ func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.Runti
 	}
 	runtimeConfig, err := m.runtimeService.GetRuntimeConfigInfo()
 	if err != nil {
-		// Do not try to call if again if this is not supported in the runtime.
+		// Do not try to call it again if this is not supported in the runtime.
 		if status, ok := status.FromError(err); ok && status.Code() == codes.Unimplemented {
 			klog.V(4).Infof("Container runtime doesn't support GetRuntimeConfigInfo()")
 			m.runtimeConfigCached = true
