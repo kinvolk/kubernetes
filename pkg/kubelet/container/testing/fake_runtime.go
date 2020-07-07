@@ -41,23 +41,25 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions   []string
-	PodList           []*FakePod
-	AllPodList        []*FakePod
-	ImageList         []kubecontainer.Image
-	APIPodStatus      v1.PodStatus
-	PodStatus         kubecontainer.PodStatus
-	StartedPods       []string
-	KilledPods        []string
-	StartedContainers []string
-	KilledContainers  []string
-	RuntimeStatus     *kubecontainer.RuntimeStatus
-	VersionInfo       string
-	APIVersionInfo    string
-	RuntimeType       string
-	Err               error
-	InspectErr        error
-	StatusErr         error
+	CalledFunctions      []string
+	PodList              []*FakePod
+	AllPodList           []*FakePod
+	ImageList            []kubecontainer.Image
+	APIPodStatus         v1.PodStatus
+	PodStatus            kubecontainer.PodStatus
+	StartedPods          []string
+	KilledPods           []string
+	StartedContainers    []string
+	KilledContainers     []string
+	RuntimeStatus        *kubecontainer.RuntimeStatus
+	RuntimeConfigInfo    *kubecontainer.RuntimeConfigInfo
+	RuntimeConfigInfoErr error
+	VersionInfo          string
+	APIVersionInfo       string
+	RuntimeType          string
+	Err                  error
+	InspectErr           error
+	StatusErr            error
 }
 
 const FakeHost = "localhost:12345"
@@ -123,6 +125,8 @@ func (f *FakeRuntime) ClearCalls() {
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
 	f.RuntimeStatus = nil
+	f.RuntimeConfigInfo = nil
+	f.RuntimeConfigInfoErr = nil
 	f.VersionInfo = ""
 	f.RuntimeType = ""
 	f.Err = nil
@@ -203,6 +207,14 @@ func (f *FakeRuntime) Status() (*kubecontainer.RuntimeStatus, error) {
 
 	f.CalledFunctions = append(f.CalledFunctions, "Status")
 	return f.RuntimeStatus, f.StatusErr
+}
+
+func (f *FakeRuntime) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetRuntimeConfigInfo")
+	return f.RuntimeConfigInfo, f.RuntimeConfigInfoErr
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*kubecontainer.Pod, error) {

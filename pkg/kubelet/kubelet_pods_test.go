@@ -37,6 +37,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
@@ -2383,5 +2384,218 @@ func TestTruncatePodHostname(t *testing.T) {
 		output, err := truncatePodHostnameIfNeeded("test-pod", test.input)
 		assert.NoError(t, err)
 		assert.Equal(t, test.output, output)
+	}
+}
+
+func TestUserNamespaceForPod(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// Runtime supports user namespaces
+	uidMappings := []*kubecontainer.UserNSMapping{
+		&kubecontainer.UserNSMapping{
+			ContainerID: 0,
+			HostID: 1000,
+			Size: 65536,
+		},
+	}
+	userNSConfig := kubecontainer.UserNamespaceConfigInfo{
+		UidMappings: uidMappings,
+		GidMappings: uidMappings,
+	}
+	// TODO: how to avoid creating a real class and mocking it instead?
+	testKubelet.fakeRuntime.RuntimeConfigInfo = &kubecontainer.RuntimeConfigInfo{UserNamespaceConfig: userNSConfig}
+
+	for desc, test := range map[string]struct {
+		input         *v1.Pod
+		expected      runtimeapi.NamespaceMode
+		expectedError bool
+	}{
+		"nil pod -> default v1 namespaces": {
+			nil,
+			runtimeapi.NamespaceMode_POD,
+			false,
+		},
+		"v1.Pod default namespaces": {
+			&v1.Pod{},
+			runtimeapi.NamespaceMode_POD,
+			false,
+		},
+		"User ns node mode": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "node",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Host Namespaces": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					HostIPC:     true,
+					HostNetwork: true,
+					HostPID:     true,
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Host Namespaces and user ns pod mode": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					HostIPC:     true,
+					HostNetwork: true,
+					HostPID:     true,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Privileged container": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Privileged: &[]bool{true}[0],
+							},
+						},
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Privileged container user ns pod mode": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Privileged: &[]bool{true}[0],
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Non namespaced capability": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Capabilities: &v1.Capabilities {
+									Add: []v1.Capability {
+										"MKNOD", "SYS_TIME", "SYS_MODULE",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Non namespaced capability with userns pod": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							SecurityContext: &v1.SecurityContext {
+								Capabilities: &v1.Capabilities {
+									Add: []v1.Capability {
+										"MKNOD", "SYS_TIME", "SYS_MODULE",
+									},
+								},
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Host path volume": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume {
+						v1.Volume {
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/tmp/anything",
+								},
+							},
+						},
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			false,
+		},
+		"Host path volume with user ns pod": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume {
+						v1.Volume {
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: "/tmp/anything",
+								},
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "pod",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+		"Bad userns annotation": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						kivolkUsernsAnn: "itsbad",
+					},
+				},
+			},
+			runtimeapi.NamespaceMode_NODE,
+			true,
+		},
+	} {
+		t.Logf("TestCase: %s", desc)
+		actual, err := kubelet.UserNamespaceForPod(test.input)
+		if test.expectedError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, actual)
+		}
 	}
 }

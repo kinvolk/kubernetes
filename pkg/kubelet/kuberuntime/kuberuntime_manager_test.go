@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"errors"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -26,6 +27,8 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1355,4 +1358,122 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 		Hash: kubecontainer.HashContainer((*v1.Container)(&pod.Spec.EphemeralContainers[0].EphemeralContainerCommon)),
 	})
 	return pod, status
+}
+
+func TestGetRuntimeConfigInfo(t *testing.T) {
+	service, _, manager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	for desc, test := range map[string]struct {
+		input         *runtimeapi.ActiveRuntimeConfig
+		expected      *kubecontainer.RuntimeConfigInfo
+		expectedError bool
+	}{
+		"nil -> empty RuntimeConfigInfo": {
+			nil,
+			&kubecontainer.RuntimeConfigInfo{},
+			false,
+		},
+		"Single mapping": {
+			&runtimeapi.ActiveRuntimeConfig{
+				UserNamespaceConfig: &runtimeapi.LinuxUserNamespaceConfig{
+					UidMappings: []*runtimeapi.LinuxIDMapping{
+						&runtimeapi.LinuxIDMapping{
+							ContainerId: 0,
+							HostId:      1000,
+							Size_:       65536,
+						},
+					},
+					GidMappings: []*runtimeapi.LinuxIDMapping{
+						&runtimeapi.LinuxIDMapping{
+							ContainerId: 0,
+							HostId:      1000,
+							Size_:       65536,
+						},
+					},
+				},
+			},
+			&kubecontainer.RuntimeConfigInfo{
+				UserNamespaceConfig: kubecontainer.UserNamespaceConfigInfo{
+					UidMappings: []*kubecontainer.UserNSMapping{
+						&kubecontainer.UserNSMapping{
+							ContainerID: 0,
+							HostID:      1000,
+							Size:        65536,
+						},
+					},
+					GidMappings: []*kubecontainer.UserNSMapping{
+						&kubecontainer.UserNSMapping{
+							ContainerID: 0,
+							HostID:      1000,
+							Size:        65536,
+						},
+					},
+				},
+			},
+			false,
+		},
+
+	} {
+		t.Logf("TestCase: %s", desc)
+		service.FakeRuntimeConfigInfo = test.input
+		// avoid caching
+		manager.runtimeConfigCached = false
+
+		actual, err := manager.GetRuntimeConfigInfo()
+		if test.expectedError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, actual)
+		}
+	}
+}
+
+func TestGetRuntimeConfigInfoCache(t *testing.T) {
+	service, _, manager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	service.FakeRuntimeConfigInfo = &runtimeapi.ActiveRuntimeConfig{}
+
+	_, err = manager.GetRuntimeConfigInfo()
+	assert.NoError(t, err)
+
+	_, err = manager.GetRuntimeConfigInfo()
+	assert.NoError(t, err)
+
+	count := 0
+	for _, c := range service.Called {
+		if c == "GetRuntimeConfigInfo" {
+			count++
+		}
+	}
+
+	assert.Equal(t, count, 1)
+}
+
+func TestGetRuntimeConfigInfoError(t *testing.T) {
+	service, _, manager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	service.FakeRuntimeConfigInfo = &runtimeapi.ActiveRuntimeConfig{}
+
+	// Test any error
+	service.InjectError("GetRuntimeConfigInfo", errors.New("test error"))
+
+	_, err = manager.GetRuntimeConfigInfo()
+	assert.Error(t, err)
+
+	// A further call should not fail
+	_, err = manager.GetRuntimeConfigInfo()
+	assert.NoError(t, err)
+
+	// Clean up cache
+	manager.runtimeConfigCached = false
+
+	// Test not implemented grpc error
+	service.InjectError("GetRuntimeConfigInfo", status.Error(codes.Unimplemented, "non implemented"))
+
+	_, err = manager.GetRuntimeConfigInfo()
+	assert.NoError(t, err)
 }

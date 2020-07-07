@@ -62,6 +62,14 @@ func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 	return "/poddir/" + string(podUID)
 }
 
+func (f *FakeRuntimeHelper) GetPodVolumesDir(podUID kubetypes.UID) string {
+	return f.GetPodDir(podUID) + "/volumes/"
+}
+
+func (f *FakeRuntimeHelper) UserNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, error) {
+	return runtimeapi.NamespaceMode_NODE, nil
+}
+
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return nil
 }

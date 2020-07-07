@@ -52,11 +52,14 @@ type RuntimeHelper interface {
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
+	GetPodVolumesDir(podUID types.UID) string
 	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
+	// UserNamespaceForPod returns the mode for the user namespace of the pod passed as argument.
+	UserNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

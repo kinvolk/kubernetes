@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-dev-shm
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "pod"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: reader
+    image: busybox
+    command: ["sh"]
+    args: ["-c", 'content=$(cat /dev/shm//foo.txt); if [[ "$content" != "bar" ]]; then exit 1; else exit 0; fi']
+  initContainers:
+  - name: writer
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "echo 'bar' > /dev/shm/foo.txt"]

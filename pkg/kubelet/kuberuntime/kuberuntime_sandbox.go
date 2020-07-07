@@ -167,7 +167,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		if sc.RunAsGroup != nil {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
-		lc.SecurityContext.NamespaceOptions = namespacesForPod(pod)
+		namespaceOptions, err := m.namespacesForPod(pod)
+		if err != nil {
+			return nil, err
+		}
+		lc.SecurityContext.NamespaceOptions = namespaceOptions
 
 		if sc.FSGroup != nil {
 			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(*sc.FSGroup))

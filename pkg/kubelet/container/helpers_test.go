@@ -614,3 +614,95 @@ func TestHashContainer(t *testing.T) {
 		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
 	}
 }
+
+func TestRuntimeConfigInfo(t *testing.T) {
+	empty := &RuntimeConfigInfo{}
+	single := &RuntimeConfigInfo{
+		UserNamespaceConfig: UserNamespaceConfigInfo{
+			UidMappings: []*UserNSMapping{
+				&UserNSMapping{
+					ContainerID: 0,
+					HostID:      100000,
+					Size:        65536,
+				},
+			},
+			GidMappings: []*UserNSMapping{
+				&UserNSMapping{
+					ContainerID: 0,
+					HostID:      200000,
+					Size:        32768,
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		config            *RuntimeConfigInfo
+		uid               uint32
+		gid               uint32
+		expectedSupported bool
+		expectedEnabled   bool
+		expectedUid       uint32
+		expectedGid       uint32
+		expectedError     bool
+	}{
+		{
+			config:            empty,
+			expectedSupported: false,
+			expectedEnabled:   false,
+			expectedError:     true,
+		},
+		{
+			config:            single,
+			expectedSupported: true,
+			expectedEnabled:   true,
+			expectedError:     false,
+			uid:               0,
+			expectedUid:       100000,
+			gid:               0,
+			expectedGid:       200000,
+		},
+		{
+			config:            single,
+			expectedSupported: true,
+			expectedEnabled:   true,
+			expectedError:     false,
+			uid:               65535,
+			expectedUid:       165535,
+			gid:               32767,
+			expectedGid:       232767,
+		},
+		{
+			config:            single,
+			expectedSupported: true,
+			expectedEnabled:   true,
+			expectedError:     true,
+			uid:               65536,
+			gid:               32768,
+		},
+	}
+
+	for _, tc := range testCases {
+		actualSupported := tc.config.IsUserNamespaceSupported()
+		assert.Equal(t, tc.expectedSupported, actualSupported)
+
+		actualEnabled := tc.config.IsUserNamespaceEnabled()
+		assert.Equal(t, tc.expectedSupported, actualEnabled)
+
+		actualUid, err := tc.config.GetHostUIDFor(tc.uid)
+		if tc.expectedError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedUid, actualUid)
+		}
+
+		actualGid, err := tc.config.GetHostGIDFor(tc.gid)
+		if tc.expectedError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedGid, actualGid)
+		}
+	}
+}

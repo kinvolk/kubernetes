@@ -1,0 +1,15 @@
+# Pod without the userns annotation and without any feature that would cause
+# the user namespace support to be disable if available in the runtime.
+# User namespace should be used if available in the runtime.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-standard
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "sleep infinity"]

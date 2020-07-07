@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -202,6 +203,41 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
+// toKubeRuntimeConfig converts the runtimeapi.ActiveRuntimeConfig to kubecontainer.RuntimeConfigInfo
+func toKubeRuntimeConfig(config *runtimeapi.ActiveRuntimeConfig) *kubecontainer.RuntimeConfigInfo {
+	usernsConfig := config.GetUserNamespaceConfig()
+	if usernsConfig == nil {
+		return &kubecontainer.RuntimeConfigInfo{}
+	}
+	uidMappingsRuntime := usernsConfig.GetUidMappings()
+	if uidMappingsRuntime == nil || len(uidMappingsRuntime) == 0 {
+		return &kubecontainer.RuntimeConfigInfo{}
+	}
+	gidMappingsRuntime := usernsConfig.GetGidMappings()
+	if gidMappingsRuntime == nil || len(gidMappingsRuntime) == 0 {
+		return &kubecontainer.RuntimeConfigInfo{}
+	}
+	var uidMappings []*kubecontainer.UserNSMapping
+	var gidMappings []*kubecontainer.UserNSMapping
+	for _, runtimeMapping := range uidMappingsRuntime {
+		uidMappings = append(uidMappings, &kubecontainer.UserNSMapping{
+			ContainerID: runtimeMapping.ContainerId,
+			HostID:      runtimeMapping.HostId,
+			Size:        runtimeMapping.Size_})
+	}
+	for _, runtimeMapping := range gidMappingsRuntime {
+		gidMappings = append(gidMappings, &kubecontainer.UserNSMapping{
+			ContainerID: runtimeMapping.ContainerId,
+			HostID:      runtimeMapping.HostId,
+			Size:        runtimeMapping.Size_})
+	}
+	userNSConfig := kubecontainer.UserNamespaceConfigInfo{
+		UidMappings: uidMappings,
+		GidMappings: gidMappings,
+	}
+	return &kubecontainer.RuntimeConfigInfo{UserNamespaceConfig: userNSConfig}
+}
+
 // getSeccompProfileFromAnnotations gets seccomp profile from annotations.
 // It gets pod's profile if containerName is empty.
 func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
@@ -258,10 +294,58 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
+func (m *kubeGenericRuntimeManager) namespacesForPod(pod *v1.Pod) (*runtimeapi.NamespaceOption, error) {
+	user, err := m.runtimeHelper.UserNamespaceForPod(pod)
+	if err != nil {
+		return nil, err
+	}
+
 	return &runtimeapi.NamespaceOption{
 		Ipc:     ipcNamespaceForPod(pod),
 		Network: networkNamespaceForPod(pod),
 		Pid:     pidNamespaceForPod(pod),
+		User:    user,
+	}, nil
+}
+
+// getHostUID returns UID on host namespace which is mapped to given UID on container namespace
+func (m *kubeGenericRuntimeManager) getHostUID(containerUID uint32) (uint32, error) {
+	return m.runtimeConfig.GetHostUIDFor(containerUID)
+}
+
+// getHostUID returns GID on host namespace which is mapped to given GID on container namespace
+func (m *kubeGenericRuntimeManager) getHostGID(containerGID uint32) (uint32, error) {
+	return m.runtimeConfig.GetHostGIDFor(containerGID)
+}
+
+// chownAllFilesAt traverses the directory tree at the give path and chowns the paths to adjust for the remapped usernamespaces
+func (m *kubeGenericRuntimeManager) chownAllFilesAt(dir string) error {
+	var files []string
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+	klog.V(5).Infof("Chowned paths %v", files)
+	for _, file := range files {
+		containerUID := uint32(0)
+		containerGID := uint32(0)
+		uid, err := m.getHostUID(containerUID)
+		if err != nil {
+			return fmt.Errorf("Failed to get remapped host UID corresponding to UID 0 in container namespace: %v", err)
+		}
+		gid, err := m.getHostGID(containerGID)
+		if err != nil {
+			return fmt.Errorf("Failed to get remapped host GID corresponding to GID 0 in container namespace: %v", err)
+		}
+		klog.V(5).Infof("Remapped default uid %d, default gid %d path %s", uid, gid, file)
+		err = os.Lchown(file, int(uid), int(gid))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

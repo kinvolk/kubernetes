@@ -67,6 +67,11 @@ func (r *Mock) Status() (*kubecontainer.RuntimeStatus, error) {
 	return args.Get(0).(*kubecontainer.RuntimeStatus), args.Error(0)
 }
 
+func (r *Mock) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
+	args := r.Called()
+	return args.Get(0).(*kubecontainer.RuntimeConfigInfo), args.Error(1)
+}
+
 func (r *Mock) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	args := r.Called(all)
 	return args.Get(0).([]*kubecontainer.Pod), args.Error(1)
