@@ -1,0 +1,20 @@
+# Pod that runs on a different user namespace and has the SYS_ADMIN capability
+# to create a tmpfs mount.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-sys-admin
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "pod"
+    container.apparmor.security.beta.kubernetes.io/container1: "unconfined"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: busybox
+    command: ["sh"]
+    args: ["-c", "mkdir temp && mount -t tmpfs -o size=10M tmpfs temp"]
+    securityContext:
+      capabilities:
+        add: ["SYS_ADMIN"]

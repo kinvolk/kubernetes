@@ -1,0 +1,19 @@
+# Pod that runs on a different user namespace and has the NET_ADMIN capability
+# to add an address to the eth0 interface.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-net-admin
+  namespace: default
+  annotations:
+    alpha.kinvolk.io/userns: "pod"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: container1
+    image: gaiadocker/iproute2
+    command: ["sh"]
+    args: ["-c", "ip addr add 10.10.10.1/24 dev eth0"]
+    securityContext:
+      capabilities:
+        add: ["NET_ADMIN"]
