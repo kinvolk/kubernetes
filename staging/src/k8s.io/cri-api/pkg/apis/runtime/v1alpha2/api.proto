@@ -1202,8 +1202,8 @@ message LinuxIDMapping {
    uint32 container_id = 1;
    // host_id is the starting ID for the mapping on the host.
    uint32 host_id = 2;
-   // length is the number of elements in the mapping.
-   uint32 length = 3;
+   // size is the number of elements in the mapping.
+   uint32 size = 3;
 }
 
 // LinuxIDMappings represents the user and group user namespace ID mappings.

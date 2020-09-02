@@ -1162,6 +1162,7 @@
     "nodeName": "365",
     "hostNetwork": true,
     "hostIPC": true,
+    "userNamespaceMode": "ʗN",
     "shareProcessNamespace": false,
     "securityContext": {
       "seLinuxOptions": {
@@ -1175,22 +1176,22 @@
         "gmsaCredentialSpec": "371",
         "runAsUserName": "372"
       },
-      "runAsUser": 4883846315878203110,
-      "runAsGroup": -7936947433725476327,
+      "runAsUser": -5712715102324619404,
+      "runAsGroup": 4565786241503790841,
       "runAsNonRoot": false,
       "supplementalGroups": [
-        6726836758549163621
+        8910036097072157478
       ],
-      "fsGroup": 741362943076737213,
+      "fsGroup": 5667186155078596628,
       "sysctls": [
         {
           "name": "373",
           "value": "374"
         }
       ],
-      "fsGroupChangePolicy": "W賁Ěɭɪǹ0",
+      "fsGroupChangePolicy": "ɭɪǹ0衷,",
       "seccompProfile": {
-        "type": ",ƷƣMț譎懚XW疪鑳",
+        "type": "ƣMț譎懚X",
         "localhostProfile": "375"
       }
     },
@@ -1209,7 +1210,7 @@
               "matchExpressions": [
                 {
                   "key": "379",
-                  "operator": "e躒訙Ǫʓ)ǂť嗆u8晲T[ir",
+                  "operator": "ay",
                   "values": [
                     "380"
                   ]
@@ -1218,7 +1219,7 @@
               "matchFields": [
                 {
                   "key": "381",
-                  "operator": "Ƶf",
+                  "operator": "/",
                   "values": [
                     "382"
                   ]
@@ -1229,12 +1230,12 @@
         },
         "preferredDuringSchedulingIgnoredDuringExecution": [
           {
-            "weight": 1627026804,
+            "weight": -1396197931,
             "preference": {
               "matchExpressions": [
                 {
                   "key": "383",
-                  "operator": "pȓɻ挴ʠɜ瞍阎lğ Ņ#耗Ǚ(ť1",
+                  "operator": "趭(娕uE增猍ǵ x",
                   "values": [
                     "384"
                   ]
@@ -1243,7 +1244,7 @@
               "matchFields": [
                 {
                   "key": "385",
-                  "operator": "",
+                  "operator": "Ȏ3Ĕ\\ɢX鰨",
                   "values": [
                     "386"
                   ]
@@ -1258,7 +1259,7 @@
           {
             "labelSelector": {
               "matchLabels": {
-                "8.3dCv3j._.-_pP__up.2L_s-o779._-k-5___-Qq..csh-3i": "1Tvw39F_C-rtSY.g._2F7.-_e..r"
+                "p8v-J1zET_..3dCv3j._.-_pP_u": "52L_s-o779._-k-5___-Qq..csh-3--Z1Tvw39F_C-rtSY.g._F"
               },
               "matchExpressions": [
                 {
