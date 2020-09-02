@@ -2880,6 +2880,14 @@ const (
 	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
 )
 
+// UserNamespaceMode holds the mode of use for user namespaces.
+type PodUserNamespaceMode string
+
+const (
+	UserNamespaceModeHost    PodUserNamespaceMode = "Host"
+	UserNamespaceModeCluster PodUserNamespaceMode = "Cluster"
+)
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -2900,6 +2908,10 @@ type PodSecurityContext struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool
+	// TODO(Mauricio): Documentation.
+	// +k8s:conversion-gen=false
+	// +optional
+	UserNamespaceMode *PodUserNamespaceMode
 	// Share a single process namespace between all of the containers in a pod.
 	// When this is set containers will be able to view and signal processes from other containers
 	// in the same pod, and the first process in each container will not be assigned PID 1.

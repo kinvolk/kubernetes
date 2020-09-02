@@ -2913,6 +2913,14 @@ type PodReadinessGate struct {
 	ConditionType PodConditionType `json:"conditionType" protobuf:"bytes,1,opt,name=conditionType,casttype=PodConditionType"`
 }
 
+// UserNamespaceMode holds the mode of use for user namespaces.
+type PodUserNamespaceMode string
+
+const (
+	UserNamespaceModeHost    PodUserNamespaceMode = "Host"
+	UserNamespaceModeCluster PodUserNamespaceMode = "Cluster"
+)
+
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
@@ -3021,6 +3029,10 @@ type PodSpec struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,13,opt,name=hostIPC"`
+	// TODO(Mauricio): Documentation.
+	// +k8s:conversion-gen=false
+	// +optional
+	UserNamespaceMode *PodUserNamespaceMode `json:"userNamespaceMode,omitempty" protobuf:"bytes,36,opt,name=userNamespaceMode"`
 	// Share a single process namespace between all of the containers in a pod.
 	// When this is set containers will be able to view and signal processes from other containers
 	// in the same pod, and the first process in each container will not be assigned PID 1.
