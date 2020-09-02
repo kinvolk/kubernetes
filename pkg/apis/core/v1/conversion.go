@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 	"reflect"
+	"unsafe"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -302,6 +303,7 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 		out.HostPID = in.SecurityContext.HostPID
 		out.HostNetwork = in.SecurityContext.HostNetwork
 		out.HostIPC = in.SecurityContext.HostIPC
+		out.UserNamespaceMode = (*v1.PodUserNamespaceMode)(unsafe.Pointer(in.SecurityContext.UserNamespaceMode))
 		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
 	}
 
@@ -357,6 +359,7 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 	out.SecurityContext.HostNetwork = in.HostNetwork
 	out.SecurityContext.HostPID = in.HostPID
 	out.SecurityContext.HostIPC = in.HostIPC
+	out.SecurityContext.UserNamespaceMode = (*core.PodUserNamespaceMode)(unsafe.Pointer(in.UserNamespaceMode))
 	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
 
 	return nil
