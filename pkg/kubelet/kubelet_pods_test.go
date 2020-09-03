@@ -2426,7 +2426,7 @@ func TestUserNamespaceForPod(t *testing.T) {
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						kivolkUsernsAnn: "node",
+						kinvolkUsernsAnn: "node",
 					},
 				},
 			},
@@ -2453,7 +2453,7 @@ func TestUserNamespaceForPod(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						kivolkUsernsAnn: "pod",
+						kinvolkUsernsAnn: "pod",
 					},
 				},
 			},
@@ -2488,7 +2488,7 @@ func TestUserNamespaceForPod(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						kivolkUsernsAnn: "pod",
+						kinvolkUsernsAnn: "pod",
 					},
 				},
 			},
@@ -2531,7 +2531,7 @@ func TestUserNamespaceForPod(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						kivolkUsernsAnn: "pod",
+						kinvolkUsernsAnn: "pod",
 					},
 				},
 			},
@@ -2570,7 +2570,7 @@ func TestUserNamespaceForPod(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						kivolkUsernsAnn: "pod",
+						kinvolkUsernsAnn: "pod",
 					},
 				},
 			},
@@ -2581,7 +2581,7 @@ func TestUserNamespaceForPod(t *testing.T) {
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						kivolkUsernsAnn: "itsbad",
+						kinvolkUsernsAnn: "itsbad",
 					},
 				},
 			},

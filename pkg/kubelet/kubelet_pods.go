@@ -72,7 +72,7 @@ const (
 	managedHostsHeaderWithHostNetwork = "# Kubernetes-managed hosts file (host network).\n"
 
 	// Kinvolk alpha annotation for user namespaces
-	kivolkUsernsAnn = "alpha.kinvolk.io/userns"
+	kinvolkUsernsAnn = "alpha.kinvolk.io/userns"
 )
 
 type UsernsAnn int
@@ -1838,7 +1838,7 @@ func getUserNsAnnotation(pod *v1.Pod) UsernsAnn {
 	if pod == nil {
 		return UsernsRuntimeDefault
 	}
-	userns, ok := pod.Annotations[kivolkUsernsAnn]
+	userns, ok := pod.Annotations[kinvolkUsernsAnn]
 	if !ok {
 		return UsernsRuntimeDefault
 	}
