@@ -1111,6 +1111,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	} else {
 		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableCAdvisorJSONEndpoints, kubeServer.EnableServer)
 		klog.Info("Started kubelet")
+		klog.Info("Kubelet compiled with user namespaces support")
 	}
 	return nil
 }
