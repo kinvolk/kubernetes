@@ -1785,7 +1785,7 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 
 	// TODO: Implement as an admit handler?
 	if _, err := kl.UserNamespaceForPod(pod); err != nil {
-		return false, "UsernsUnsupported", "User namespace cannot be enabled"
+		return false, "UsernsUnsupported", err.Error()
 	}
 
 	return true, "", ""
