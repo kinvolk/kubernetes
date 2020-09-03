@@ -1822,14 +1822,17 @@ func (kl *Kubelet) UserNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, e
 		}
 		return runtimeapi.NamespaceMode_NODE, nil
 	case UsernsPod:
-		if kl.enableHostUserNamespace(pod) || !runtimeEnabled {
-			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("user namespace can't be enabled")
+		if kl.enableHostUserNamespace(pod) {
+			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("PodSpec doesn't allow to use 'Pod' mode for user namespaces")
+		}
+		if !runtimeEnabled {
+			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("runtime doesn't support user namespaces")
 		}
 		return runtimeapi.NamespaceMode_POD, nil
 	case UsernsNode:
 		return runtimeapi.NamespaceMode_NODE, nil
 	default:
-		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("invalid value for user ns annotation")
+		return runtimeapi.NamespaceMode_NODE, fmt.Errorf("invalid value for the %q annotation", kinvolkUsernsAnn)
 	}
 }
 
