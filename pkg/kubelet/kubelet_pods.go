@@ -1822,8 +1822,8 @@ func (kl *Kubelet) UserNamespaceForPod(pod *v1.Pod) (runtimeapi.NamespaceMode, e
 		}
 		return runtimeapi.NamespaceMode_NODE, nil
 	case UsernsPod:
-		if kl.enableHostUserNamespace(pod) {
-			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("PodSpec doesn't allow to use 'Pod' mode for user namespaces")
+		if hasHostNamespace(pod) {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, "UserNsWarning", "User namespace mode is 'Pod' and PodSpec shares a host namespace.")
 		}
 		if !runtimeEnabled {
 			return runtimeapi.NamespaceMode_NODE, fmt.Errorf("runtime doesn't support user namespaces")
