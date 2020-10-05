@@ -60,6 +60,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -1955,4 +1956,42 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// TODO(Mauricio): Documentation
+func (kl *Kubelet) GetPodIDMappings(pod *v1.Pod) *runtimeapi.LinuxIDMappings {
+	if pod == nil {
+		return nil
+	}
+
+	uids := kl.clusterIDMappings.UIDs()
+	gids := kl.clusterIDMappings.GIDs()
+
+	// punch hole for fsGroup
+	if pod.Spec.SecurityContext.FSGroup != nil {
+		fsGroup := uint32(*pod.Spec.SecurityContext.FSGroup )
+		gids = idtools.PunchHole(fsGroup, gids)
+	}
+
+	return &runtimeapi.LinuxIDMappings {
+		UidMappings: convertIDMappingsToRuntime(uids),
+		GidMappings: convertIDMappingsToRuntime(gids),
+	}
+}
+
+func convertIDMappingsToRuntime(mappings []idtools.IDMapping) []*runtimeapi.LinuxIDMapping {
+	if len(mappings) == 0 {
+		return nil
+	}
+
+	maps := make([]*runtimeapi.LinuxIDMapping, len(mappings))
+	for i, mapping := range mappings {
+		maps[i] = &runtimeapi.LinuxIDMapping{
+			ContainerId: mapping.ContainerID,
+			HostId:      mapping.HostID,
+			Size_:       mapping.Size,
+		}
+	}
+
+	return maps
 }

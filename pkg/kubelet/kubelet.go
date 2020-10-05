@@ -105,6 +105,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -472,6 +473,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		protocol = utilipt.ProtocolIPv6
 	}
 
+	clusterIDMappings, err := convertIDMappings(kubeCfg.ClusterIDMappings)
+	if err != nil {
+		return nil, fmt.Errorf("cluster ID mappings are invalid: %v", err)
+	}
+
 	klet := &Kubelet{
 		hostname:                                hostname,
 		hostnameOverridden:                      hostnameOverridden,
@@ -526,6 +532,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
 		lastContainerStartedTime:                newTimeCache(),
+		clusterIDMappings:                       clusterIDMappings,
 	}
 
 	if klet.cloud != nil {
@@ -1144,6 +1151,9 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// TODO(Mauricio): Documentation
+	clusterIDMappings *idtools.IDMappings
 }
 
 // setupDataDirs creates:
@@ -2240,4 +2250,29 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		}
 	}
 	return config
+}
+
+func convertIDMappings(configMaps kubeletconfiginternal.LinuxIDMappings) (*idtools.IDMappings, error) {
+	uids := []idtools.IDMapping{}
+	gids := []idtools.IDMapping{}
+
+	for _, v := range configMaps.UIDMappings {
+		x := idtools.IDMapping {
+			ContainerID: v.ContainerID,
+			HostID: v.HostID,
+			Size: v.Size,
+		}
+		uids = append(uids, x)
+	}
+
+	for _, v := range configMaps.GIDMappings {
+		x := idtools.IDMapping {
+			ContainerID: v.ContainerID,
+			HostID: v.HostID,
+			Size: v.Size,
+		}
+		gids = append(gids, x)
+	}
+
+	return idtools.NewIDMappings(uids, gids)
 }
