@@ -363,6 +363,8 @@ type KubeletConfiguration struct {
 	Logging componentbaseconfig.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
+	// TODO(Mauricio): Doc
+	ClusterIDMappings LinuxIDMappings
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -440,3 +442,24 @@ type SerializedNodeConfigSource struct {
 	// +optional
 	Source v1.NodeConfigSource
 }
+
+// LinuxIDMapping represents a single user namespace ID mapping.
+type LinuxIDMapping struct {
+	// HostID is the starting ID of the mapping in the host.
+	HostID uint32
+	// ContainerID is the starting ID of the mapping in the container.
+	ContainerID uint32
+	// Size is teh number of elements in the mapping.
+	Size uint32
+}
+
+// LinuxIDMappings represents the user and group user namespace ID mappings.
+type LinuxIDMappings struct {
+	// +listType=set
+	// +optional
+	UIDMappings []LinuxIDMapping
+	// +listType=set
+	// +optional
+	GIDMappings []LinuxIDMapping
+}
+

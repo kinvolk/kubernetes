@@ -803,6 +803,9 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// TODO(Mauricio); Docs
+	// Default: nil
+	ClusterIDMappings LinuxIDMappings `json:"clusterIDMappings,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -882,4 +885,24 @@ type SerializedNodeConfigSource struct {
 	// Source is the source that we are serializing
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
+}
+
+// LinuxIDMapping represents a single user namespace ID mapping.
+type LinuxIDMapping struct {
+	// HostID is the starting ID of the mapping in the host.
+	HostID uint32 `json:"hostID"`
+	// ContainerID is the starting ID of the mapping in the container.
+	ContainerID uint32 `json:"containerID"`
+	// Size is teh number of elements in the mapping.
+	Size uint32 `json:"size"`
+}
+
+// LinuxIDMappings represents the user and group user namespace ID mappings.
+type LinuxIDMappings struct {
+	// +listType=set
+	// +optional
+	UIDMappings []LinuxIDMapping `json:"uidMappings,omitempty"`
+	// +listType=set
+	// +optional
+	GIDMappings []LinuxIDMapping `json:"gidMappings,omitempty"`
 }
