@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -276,4 +277,14 @@ func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 
 func (kvh *kubeletVolumeHost) GetExec(pluginName string) utilexec.Interface {
 	return kvh.exec
+}
+
+func (kvh *kubeletVolumeHost) GetPodIDMappings(pod *v1.Pod) *idtools.IDMappings {
+	if pod != nil && pod.Spec.UserNamespaceMode != nil {
+		switch *pod.Spec.UserNamespaceMode {
+		case v1.UserNamespaceModeCluster:
+			return kvh.kubelet.clusterIDMappings
+		}
+	}
+	return nil
 }

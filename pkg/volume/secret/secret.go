@@ -239,7 +239,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	}()
 
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
-	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
+	writer, err := volumeutil.NewAtomicWriter(dir, writerContext, b.plugin.host.GetPodIDMappings(&b.pod))
 	if err != nil {
 		klog.Errorf("Error creating atomic writer: %v", err)
 		return err

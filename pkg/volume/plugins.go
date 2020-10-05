@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -454,6 +455,9 @@ type VolumeHost interface {
 
 	// Returns options to pass for proxyutil filtered dialers.
 	GetFilteredDialOptions() *proxyutil.FilteredDialOptions
+
+	// TODO(Mauricio): Documentation
+	GetPodIDMappings(pod *v1.Pod) *idtools.IDMappings
 }
 
 // VolumePluginMgr tracks registered plugins.

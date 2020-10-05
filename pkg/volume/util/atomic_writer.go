@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 )
 
 const (
@@ -59,6 +60,7 @@ const (
 type AtomicWriter struct {
 	targetDir  string
 	logContext string
+	idMappings *idtools.IDMappings
 }
 
 // FileProjection contains file Data and access Mode
@@ -70,13 +72,13 @@ type FileProjection struct {
 
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
 // target directory, or returns an error if the target directory does not exist.
-func NewAtomicWriter(targetDir string, logContext string) (*AtomicWriter, error) {
+func NewAtomicWriter(targetDir string, logContext string, idMappings *idtools.IDMappings) (*AtomicWriter, error) {
 	_, err := os.Stat(targetDir)
 	if os.IsNotExist(err) {
 		return nil, err
 	}
 
-	return &AtomicWriter{targetDir: targetDir, logContext: logContext}, nil
+	return &AtomicWriter{targetDir: targetDir, logContext: logContext, idMappings: idMappings}, nil
 }
 
 const (
@@ -397,11 +399,40 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 			return err
 		}
 
-		if fileProjection.FsUser == nil {
+		if w.idMappings == nil && fileProjection.FsUser == nil {
 			continue
 		}
-		if err := os.Chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
-			klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, fullPath, int(*fileProjection.FsUser), err)
+
+		uid := -1
+		gid := -1
+
+		if fileProjection.FsUser != nil {
+			uid = int(*fileProjection.FsUser)
+		}
+
+		// TODO(Mauricio): What about if uid or gid mapping is missing?
+		if w.idMappings != nil {
+			if uid == -1 {
+				uid = 0
+			}
+			gid = 0
+			uidHost, err := w.idMappings.UIDToHost(uint32(uid))
+			if err != nil {
+				klog.Errorf("%s: failed to map UID %d to host for %s", w.logContext)
+				return err
+			}
+			gidHost, err := w.idMappings.GIDToHost(uint32(gid))
+			if err != nil {
+				klog.Errorf("%s: failed to map GID %d to host for %s", w.logContext)
+				return err
+			}
+
+			uid = int(uidHost)
+			gid = int(gidHost)
+		}
+
+		if err := os.Chown(fullPath, uid, gid); err != nil {
+			klog.Errorf("%s: unable to change file %s with owner %v:%v: %v", w.logContext, fullPath, uid, gid, err)
 			return err
 		}
 	}
