@@ -88,7 +88,7 @@ func PunchHole(id uint32, maps []IDMapping) []IDMapping {
 				Size: id - m.ContainerID,
 			}
 			x2 := IDMapping{
-				HostID: id + 1,
+				HostID: m.HostID + (id - m.ContainerID) + 1,
 				ContainerID: id + 1,
 				Size: m.Size - x1.Size - 1,
 			}
