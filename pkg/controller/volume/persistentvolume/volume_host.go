@@ -33,6 +33,8 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 )
 
 // VolumeHost interface implementation for PersistentVolumeController.
@@ -142,4 +144,8 @@ func (ctrl *PersistentVolumeController) GetSubpather() subpath.Interface {
 
 func (ctrl *PersistentVolumeController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
 	return ctrl.filteredDialOptions
+}
+
+func (ctrl *PersistentVolumeController) GetPodIDMappings(pod *v1.Pod) *idtools.IDMappings {
+	return nil
 }

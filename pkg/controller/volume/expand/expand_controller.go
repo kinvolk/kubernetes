@@ -54,6 +54,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 )
 
 const (
@@ -457,4 +459,8 @@ func (expc *expandController) GetSubpather() subpath.Interface {
 
 func (expc *expandController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
 	return expc.filteredDialOptions
+}
+
+func (expc *expandController)  GetPodIDMappings(pod *v1.Pod) *idtools.IDMappings {
+	return nil
 }

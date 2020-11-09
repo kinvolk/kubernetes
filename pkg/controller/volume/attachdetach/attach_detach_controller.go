@@ -62,6 +62,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+
+	"k8s.io/kubernetes/pkg/kubelet/util/idtools"
 )
 
 // TimerConfig contains configuration of internal attach/detach timers and
@@ -825,4 +827,8 @@ func (adc *attachDetachController) GetFilteredDialOptions() *proxyutil.FilteredD
 
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {
 	return adc.csiDriverLister
+}
+
+func (adc *attachDetachController) GetPodIDMappings(pod *v1.Pod) *idtools.IDMappings {
+	return nil
 }
