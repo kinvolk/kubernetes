@@ -489,25 +489,44 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 		return false
 	}
 
-	restStarted := false
-	for idx, container := range pod.Spec.Containers {
-		if _, ok := rest[idx]; !ok {
+	// See if we can check podStatus (not as reported by the container
+	// runtime) when the APIserver is down
+	// For this, we will check it here and print on evert run.
+	// To test, just kill the API server, kill containers in the pod and see
+	// the kubelet log
+	for _, container := range pod.Spec.Containers {
+		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
+		if !ok {
+			klog.V(1).Infof("XXX rata: Status is nil for pod: %q, container: %q", pod.Name, container.Name)
 			continue
 		}
 
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status != nil {
-			restStarted = true
-			break
+		if status.Ready {
+			klog.V(1).Infof("XXX rata: Status is ready for pod: %q, container: %q", pod.Name, container.Name)
+		} else {
+			klog.V(1).Infof("XXX rata: Status is not ready for pod: %q, container: %q", pod.Name, container.Name)
 		}
 	}
 
+	//restStarted := false
+	//for idx, container := range pod.Spec.Containers {
+	//	if _, ok := rest[idx]; !ok {
+	//		continue
+	//	}
+
+	//	status := podStatus.FindContainerStatusByName(container.Name)
+	//	if status != nil {
+	//		restStarted = true
+	//		break
+	//	}
+	//}
+
 	// If the other containers are started, the regular sync in the calling
 	// function should be done. Nothing special about sidecars to do.
-	if restStarted {
-		klog.V(5).Infof("Non-sidecar containers already started for pod: %q. Continuing with the main loop", pod.Name)
-		return false
-	}
+	//if restStarted {
+	//	klog.V(5).Infof("Non-sidecar containers already started for pod: %q. Continuing with the main loop", pod.Name)
+	//	return false
+	//}
 
 	// c&p from computePodActions() final loop, but adapted to consider only
 	// sidecar containers.
