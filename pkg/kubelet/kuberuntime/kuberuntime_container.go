@@ -740,7 +740,9 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 // Status is only returned if an init container is failed, in which case next will
 // point to the current container.
 func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
+	klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun")
 	if len(pod.Spec.InitContainers) == 0 {
+		klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun: 0.1")
 		return nil, nil, true
 	}
 
@@ -758,25 +760,31 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
+			klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun: 1")
 			continue
 		}
 
 		// container is still running, return not done.
 		if status.State == kubecontainer.ContainerStateRunning {
+			klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun: 2")
 			return nil, nil, false
 		}
 
 		if status.State == kubecontainer.ContainerStateExited {
+			klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun: 3")
 			// all init containers successful
 			if i == (len(pod.Spec.InitContainers) - 1) {
+				klog.V(4).Infof("XXX rata: checking findNextInitContainerToRun: 4")
 				return nil, nil, true
 			}
 
+			klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun: 5")
 			// all containers up to i successful, go to i+1
 			return nil, &pod.Spec.InitContainers[i+1], false
 		}
 	}
 
+	klog.V(1).Infof("XXX rata: checking findNextInitContainerToRun: 6")
 	return nil, &pod.Spec.InitContainers[0], false
 }
 

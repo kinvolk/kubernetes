@@ -493,6 +493,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
+	klog.V(1).Infof("XXX rata: Syncing Pod %q", format.Pod(pod))
 
 	createPodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
 	changes := podActions{
@@ -558,6 +559,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		}
 	}
 
+	klog.V(1).Infof("XXX rata: checking initContainers")
 	// Check initialization progress.
 	initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
 	if !done {
@@ -583,6 +585,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		return changes
 	}
 
+	klog.V(1).Infof("XXX rata: checking initContainers: DONE")
 	// Number of running containers to keep.
 	keepCount := 0
 	// check the status of containers.
