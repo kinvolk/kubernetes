@@ -508,25 +508,25 @@ func (m *kubeGenericRuntimeManager) waitForSidecars(pod *v1.Pod, podStatus *kube
 		}
 	}
 
-	//restStarted := false
-	//for idx, container := range pod.Spec.Containers {
-	//	if _, ok := rest[idx]; !ok {
-	//		continue
-	//	}
+	restStarted := false
+	for idx, container := range pod.Spec.Containers {
+		if _, ok := rest[idx]; !ok {
+			continue
+		}
 
-	//	status := podStatus.FindContainerStatusByName(container.Name)
-	//	if status != nil {
-	//		restStarted = true
-	//		break
-	//	}
-	//}
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil {
+			restStarted = true
+			break
+		}
+	}
 
 	// If the other containers are started, the regular sync in the calling
 	// function should be done. Nothing special about sidecars to do.
-	//if restStarted {
-	//	klog.V(5).Infof("Non-sidecar containers already started for pod: %q. Continuing with the main loop", pod.Name)
-	//	return false
-	//}
+	if restStarted {
+		klog.V(5).Infof("Non-sidecar containers already started for pod: %q. Continuing with the main loop", pod.Name)
+		return false
+	}
 
 	// c&p from computePodActions() final loop, but adapted to consider only
 	// sidecar containers.

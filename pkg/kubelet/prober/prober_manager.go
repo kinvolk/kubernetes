@@ -298,6 +298,9 @@ func (m *manager) workerCount() int {
 func (m *manager) updateReadiness() {
 	update := <-m.readinessManager.Updates()
 
+	// TODO: add prints and see if this is executed while API server is
+	// down, therefore we SHOULD see the readiness status up to date
+	// anyways?
 	ready := update.Result == results.Success
 	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
 }

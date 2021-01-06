@@ -161,7 +161,12 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 	if p.Exec != nil {
 		klog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
+		klog.V(1).Infof("XXX rata: Exec-Probe Pod: %v, Container: %v, Command: %v", pod.Name, container.Name, p.Exec.Command)
+		r, s, e := pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
+		klog.V(1).Infof("XXX rata: r == probe.Success:%v, s: %v, e: %v", r == probe.Success, s, e)
+		//return probe.Failure, s, e
+		return r, s, e
+
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))

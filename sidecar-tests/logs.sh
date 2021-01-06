@@ -9,7 +9,7 @@ sleep)
 	trap "echo $DATE $NAME $CONTAINERID Received SIGTERM >> $LOG; exit 0" SIGTERM
 	echo "$DATE $NAME $CONTAINERID Starting" >> $LOG
 
-	sleep 10
+	sleep 60
 	touch /tmp/ready
 
 	while true

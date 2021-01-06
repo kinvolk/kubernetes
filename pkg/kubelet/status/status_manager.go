@@ -172,6 +172,7 @@ func (m *manager) Start() {
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+	//klog.V(1).Infof("XXX rata: Status Manager: GetPodStatus")
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	status, ok := m.podStatuses[types.UID(m.podManager.TranslatePodUID(uid))]
