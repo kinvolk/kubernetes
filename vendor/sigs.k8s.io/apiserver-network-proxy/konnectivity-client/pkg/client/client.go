@@ -86,20 +86,54 @@ func CreateSingleUseGrpcTunnel(ctx context.Context, address string, opts ...grpc
 		readTimeoutSeconds: 10,
 	}
 
-	go tunnel.serve(c)
+	go tunnel.myServe(c)
 
 	return tunnel, nil
 }
 
-func (t *grpcTunnel) serve(c clientConn) {
+func (t *grpcTunnel) myServe(c clientConn) {
+	stopCh := make(chan error)
+	go t.serve(c, stopCh)
+
+	var idleCount int
+	ticker := time.Tick(1 * time.Minute)
+
+loop:
+	for {
+		select {
+		case <-stopCh:
+			klog.V(2).ErrorS(fmt.Errorf("stoppping"), "XXX: rata. closing conn")
+			break loop
+		case <-ticker:
+			klog.V(2).ErrorS(fmt.Errorf("conn opened"), "XXX: rata. clock is ticking")
+
+			idleCount += 1
+			if idleCount >= 3 {
+				klog.V(2).ErrorS(fmt.Errorf("conn opened"), "XXX: rata. FORCING conn close")
+				c.Close()
+				break loop
+			}
+		}
+	}
+
+	return
+
+}
+
+func (t *grpcTunnel) serve(c clientConn, stopCh chan error) {
 	defer c.Close()
+	defer close(stopCh)
 
 	for {
+		// TODO: Use a select here to wait for either timeout or
+		// receiving something.
 		pkt, err := t.stream.Recv()
 		if err == io.EOF {
+			klog.V(1).InfoS("XXX: rata. chk 8")
 			return
 		}
 		if err != nil || pkt == nil {
+			klog.V(1).InfoS("XXX: rata. chk 7")
 			klog.ErrorS(err, "stream read failure")
 			return
 		}
@@ -115,22 +149,26 @@ func (t *grpcTunnel) serve(c clientConn) {
 
 			if !ok {
 				klog.V(1).Infoln("DialResp not recognized; dropped")
+				klog.V(1).InfoS("XXX: rata. chk 6", "connectionID", resp.ConnectID)
+				return
 			} else {
 				result := dialResult{
 					err:    resp.Error,
 					connid: resp.ConnectID,
 				}
-				select  {
+				select {
 				case ch <- result:
 				default:
 					klog.ErrorS(fmt.Errorf("blocked pending channel"), "Received second dial response for connection request", "connectionID", resp.ConnectID, "dialID", resp.Random)
 					// On multiple dial responses, avoid leaking serve goroutine.
+					klog.V(1).InfoS("XXX: rata. chk 5", "connectionID", resp.ConnectID)
 					return
 				}
 			}
 
 			if resp.Error != "" {
 				// On dial error, avoid leaking serve goroutine.
+				klog.V(1).InfoS("XXX: rata. chk 4", "connectionID", resp.ConnectID)
 				return
 			}
 
@@ -148,10 +186,13 @@ func (t *grpcTunnel) serve(c clientConn) {
 					timer.Stop()
 				case <-timer.C:
 					klog.ErrorS(fmt.Errorf("timeout"), "readTimeout has been reached, the grpc connection to the proxy server will be closed", "connectionID", conn.connID, "readTimeoutSeconds", t.readTimeoutSeconds)
+					klog.V(1).InfoS("XXX: rata. chk 3", "connectionID", resp.ConnectID)
 					return
 				}
 			} else {
 				klog.V(1).InfoS("connection not recognized", "connectionID", resp.ConnectID)
+				klog.V(1).InfoS("XXX: rata. chk 2", "connectionID", resp.ConnectID)
+				return
 			}
 		case client.PacketType_CLOSE_RSP:
 			resp := pkt.GetCloseResponse()
@@ -166,9 +207,16 @@ func (t *grpcTunnel) serve(c clientConn) {
 				t.connsLock.Lock()
 				delete(t.conns, resp.ConnectID)
 				t.connsLock.Unlock()
+				klog.V(1).InfoS("XXX: rata. chk 1", "connectionID", resp.ConnectID)
 				return
 			}
 			klog.V(1).InfoS("connection not recognized", "connectionID", resp.ConnectID)
+			klog.V(1).InfoS("XXX: rata. chk 0.1", "connectionID", resp.ConnectID)
+			return
+
+		default:
+			klog.V(1).InfoS("XXX: rata. Packet not recognized! chk 0.2")
+			return
 		}
 	}
 }
