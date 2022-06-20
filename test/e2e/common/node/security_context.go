@@ -49,6 +49,43 @@ var _ = SIGDescribe("Security Context", func() {
 		podClient = f.PodClient()
 	})
 
+	ginkgo.Context("When creating a pod with HostUsers", func() {
+		makePod := func(hostUsers bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "userns-" + string(uuid.NewUUID()),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "userns-test",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"cat", "/proc/self/uid_map"},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+					HostUsers:     &hostUsers,
+				},
+			}
+		}
+
+		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesSupport]", func() {
+			// with hostUsers=false the pod must use a new user namespace
+			pod := makePod(false)
+			f.TestContainerOutput("read namespace", pod, 0, []string{
+				"65536",
+			})
+		})
+
+		ginkgo.It("must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesSupport]", func() {
+			// with hostUsers=true the pod must use the host user namespace
+			pod := makePod(true)
+			f.TestContainerOutput("read namespace", pod, 0, []string{
+				"4294967295",
+			})
+		})
+	})
+
 	ginkgo.Context("When creating a container with runAsUser", func() {
 		makeUserPod := func(podName, image string, command []string, userid int64) *v1.Pod {
 			return &v1.Pod{
