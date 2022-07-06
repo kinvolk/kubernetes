@@ -21,11 +21,13 @@ package util
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -273,6 +275,7 @@ IAAAAAAAsDyZDwU=`
 		t.Fatalf("Unexpected decoded binary size: expected 125, got %v", numBytes)
 	}
 
+	fsUser := int64(100)
 	cases := []struct {
 		name    string
 		payload map[string]FileProjection
@@ -311,6 +314,14 @@ IAAAAAAAsDyZDwU=`
 			success: true,
 		},
 		{
+			name: "basic fsUser",
+			payload: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo"), FsUser: &fsUser},
+				"bar": {Mode: 0644, Data: []byte("bar"), FsUser: &fsUser},
+			},
+			success: true,
+		},
+		{
 			name: "basic mode 1",
 			payload: map[string]FileProjection{
 				"foo": {Mode: 0777, Data: []byte("foo")},
@@ -339,6 +350,16 @@ IAAAAAAAsDyZDwU=`
 			success: true,
 		},
 		{
+			name: "dotfiles fsUser",
+			payload: map[string]FileProjection{
+				"foo":           {Mode: 0644, FsUser: &fsUser, Data: []byte("foo")},
+				"bar":           {Mode: 0644, FsUser: &fsUser, Data: []byte("bar")},
+				".dotfile":      {Mode: 0644, FsUser: &fsUser, Data: []byte("dotfile")},
+				".dotfile.file": {Mode: 0644, FsUser: &fsUser, Data: []byte("dotfile.file")},
+			},
+			success: true,
+		},
+		{
 			name: "subdirectories 1",
 			payload: map[string]FileProjection{
 				"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar")},
@@ -351,6 +372,14 @@ IAAAAAAAsDyZDwU=`
 			payload: map[string]FileProjection{
 				"foo/bar.txt": {Mode: 0400, Data: []byte("foo/bar")},
 				"bar/zab.txt": {Mode: 0644, Data: []byte("bar/zab.txt")},
+			},
+			success: true,
+		},
+		{
+			name: "subdirectories fsUser 1",
+			payload: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0400, FsUser: &fsUser, Data: []byte("foo/bar")},
+				"bar/zab.txt": {Mode: 0644, FsUser: &fsUser, Data: []byte("bar/zab.txt")},
 			},
 			success: true,
 		},
@@ -413,6 +442,8 @@ IAAAAAAAsDyZDwU=`
 }
 
 func TestUpdate(t *testing.T) {
+	firstFsUser := int64(100)
+	nextFsUser := int64(200)
 	cases := []struct {
 		name        string
 		first       map[string]FileProjection
@@ -428,6 +459,18 @@ func TestUpdate(t *testing.T) {
 			next: map[string]FileProjection{
 				"foo": {Mode: 0644, Data: []byte("foo2")},
 				"bar": {Mode: 0640, Data: []byte("bar2")},
+			},
+			shouldWrite: true,
+		},
+		{
+			name: "update fsUser",
+			first: map[string]FileProjection{
+				"foo": {Mode: 0644, FsUser: &firstFsUser, Data: []byte("foo")},
+				"bar": {Mode: 0644, FsUser: &firstFsUser, Data: []byte("bar")},
+			},
+			next: map[string]FileProjection{
+				"foo": {Mode: 0644, FsUser: &nextFsUser, Data: []byte("foo2")},
+				"bar": {Mode: 0640, FsUser: &nextFsUser, Data: []byte("bar2")},
 			},
 			shouldWrite: true,
 		},
@@ -469,6 +512,19 @@ func TestUpdate(t *testing.T) {
 			shouldWrite: true,
 		},
 		{
+			name: "add fsUser 1",
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, FsUser: &firstFsUser, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, FsUser: &firstFsUser, Data: []byte("bar")},
+			},
+			next: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, FsUser: &nextFsUser, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, FsUser: &nextFsUser, Data: []byte("bar")},
+				"blu/zip.txt": {Mode: 0644, FsUser: &nextFsUser, Data: []byte("zip")},
+			},
+			shouldWrite: true,
+		},
+		{
 			name: "add 2",
 			first: map[string]FileProjection{
 				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
@@ -478,6 +534,19 @@ func TestUpdate(t *testing.T) {
 				"foo/bar.txt":             {Mode: 0644, Data: []byte("foo")},
 				"bar/zab.txt":             {Mode: 0644, Data: []byte("bar")},
 				"blu/two/2/3/4/5/zip.txt": {Mode: 0644, Data: []byte("zip")},
+			},
+			shouldWrite: true,
+		},
+		{
+			name: "add fsUser 2",
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, FsUser: &firstFsUser, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, FsUser: &firstFsUser, Data: []byte("bar")},
+			},
+			next: map[string]FileProjection{
+				"foo/bar.txt":             {Mode: 0644, FsUser: &nextFsUser, Data: []byte("foo")},
+				"bar/zab.txt":             {Mode: 0644, FsUser: &nextFsUser, Data: []byte("bar")},
+				"blu/two/2/3/4/5/zip.txt": {Mode: 0644, FsUser: &nextFsUser, Data: []byte("zip")},
 			},
 			shouldWrite: true,
 		},
@@ -601,6 +670,8 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestMultipleUpdates(t *testing.T) {
+	fsUser100 := int64(100)
+	fsUser200 := int64(200)
 	cases := []struct {
 		name     string
 		payloads []map[string]FileProjection
@@ -632,6 +703,19 @@ func TestMultipleUpdates(t *testing.T) {
 				{
 					"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar2")},
 					"bar/zab.txt": {Mode: 0400, Data: []byte("bar/zab.txt2")},
+				},
+			},
+		},
+		{
+			name: "update fsUser 2",
+			payloads: []map[string]FileProjection{
+				{
+					"foo/bar.txt": {Mode: 0644, FsUser: &fsUser100, Data: []byte("foo/bar")},
+					"bar/zab.txt": {Mode: 0644, FsUser: &fsUser100, Data: []byte("bar/zab.txt")},
+				},
+				{
+					"foo/bar.txt": {Mode: 0644, FsUser: &fsUser200, Data: []byte("foo/bar2")},
+					"bar/zab.txt": {Mode: 0400, FsUser: &fsUser200, Data: []byte("bar/zab.txt2")},
 				},
 			},
 		},
@@ -775,7 +859,19 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		}
 		mode := int32(fileInfo.Mode())
 
-		observedPayload[relativePath] = FileProjection{Data: content, Mode: mode}
+		var fsUser *int64
+		// Only add a non-nil FsUSer if the payload we will compare to has one.
+		// IOW, only add it if the test is testing that.
+		if p, ok := payload[relativePath]; ok && p.FsUser != nil {
+			stat_t, ok := fileInfo.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("Couldn't get file stat_t")
+			}
+			uid := int64(stat_t.Uid)
+			fsUser = &uid
+		}
+
+		observedPayload[relativePath] = FileProjection{Data: content, Mode: mode, FsUser: fsUser}
 
 		return nil
 	}
