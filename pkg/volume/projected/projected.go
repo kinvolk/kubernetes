@@ -269,7 +269,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 					},
 				}
 			}
-			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, optional)
+			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, mounterArgs.FsUser, optional)
 			if err != nil {
 				klog.Errorf("Couldn't get secret payload %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 				errlist = append(errlist, err)
@@ -294,7 +294,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 					},
 				}
 			}
-			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional)
+			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, mounterArgs.FsUser, optional)
 			if err != nil {
 				klog.Errorf("Couldn't get configMap payload %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
 				errlist = append(errlist, err)
@@ -304,7 +304,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[k] = v
 			}
 		case source.DownwardAPI != nil:
-			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode)
+			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode, mounterArgs.FsUser)
 			if err != nil {
 				errlist = append(errlist, err)
 				continue

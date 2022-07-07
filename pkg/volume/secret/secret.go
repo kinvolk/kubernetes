@@ -203,7 +203,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		len(secret.Data),
 		totalBytes)
 
-	payload, err := MakePayload(b.source.Items, secret, b.source.DefaultMode, optional)
+	payload, err := MakePayload(b.source.Items, secret, b.source.DefaultMode, mounterArgs.FsUser, optional)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 }
 
 // MakePayload function is exported so that it can be called from the projection volume driver
-func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
+func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, fsUser *int64, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -266,6 +266,8 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 		for name, data := range secret.Data {
 			fileProjection.Data = []byte(data)
 			fileProjection.Mode = *defaultMode
+			// Honor FsUser only if feature flag is set.
+			volumeutil.SetFsUserIfUsernsEnabled(&fileProjection, fsUser)
 			payload[name] = fileProjection
 		}
 	} else {
@@ -286,6 +288,9 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 			} else {
 				fileProjection.Mode = *defaultMode
 			}
+			// Honor FsUser only if feature flag is set.
+			volumeutil.SetFsUserIfUsernsEnabled(&fileProjection, fsUser)
+
 			payload[ktp.Path] = fileProjection
 		}
 	}
