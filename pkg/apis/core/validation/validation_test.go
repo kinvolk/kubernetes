@@ -17621,6 +17621,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.HostIPC",
 		"SecurityContext.HostNetwork",
 		"SecurityContext.HostPID",
+		"SecurityContext.HostUsers",
 		"SecurityContext.RunAsGroup",
 		"SecurityContext.RunAsUser",
 		"SecurityContext.SELinuxOptions",
@@ -19920,6 +19921,130 @@ func TestValidateNonSpecialIP(t *testing.T) {
 			errs := ValidateNonSpecialIP(tc.ip, fp)
 			if len(errs) == 0 {
 				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+			}
+		})
+	}
+}
+
+func TestValidateHostUsers(t *testing.T) {
+	falseVar := false
+	trueVar := true
+
+	cases := []struct {
+		name           string
+		success        bool
+		featureEnabled bool
+		spec           *core.PodSpec
+	}{
+		{
+			name:           "empty",
+			success:        true,
+			featureEnabled: true,
+			spec:           &core.PodSpec{},
+		},
+		{
+			name:    "f: disabled hostUsers unset",
+			success: true,
+			spec:    &core.PodSpec{},
+		},
+		{
+			name:           "f: enabled hostUsers=false",
+			featureEnabled: true,
+			success:        true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+			},
+		},
+		{
+			name:           "f: enabled hostUsers=true",
+			featureEnabled: true,
+			success:        true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &trueVar,
+				},
+			},
+		},
+		{
+			name:           "f: enabled hostUsers=false & volumes",
+			featureEnabled: true,
+			success:        true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &trueVar,
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "configmap",
+						VolumeSource: core.VolumeSource{
+							ConfigMap: &core.ConfigMapVolumeSource{
+								LocalObjectReference: core.LocalObjectReference{Name: "configmap"},
+							},
+						},
+					},
+					{
+						Name: "secret",
+						VolumeSource: core.VolumeSource{
+							Secret: &core.SecretVolumeSource{
+								SecretName: "secret",
+							},
+						},
+					},
+					{
+						Name: "downward-api",
+						VolumeSource: core.VolumeSource{
+							DownwardAPI: &core.DownwardAPIVolumeSource{},
+						},
+					},
+					{
+						Name: "proj",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{},
+						},
+					},
+					{
+						Name: "empty-dir",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "f: enabled hostUsers=false - unsupported volume",
+			success: false,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &trueVar,
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "host-path",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, tc.featureEnabled)()
+			opts := PodValidationOptions{AllowWindowsHostProcessField: tc.featureEnabled}
+			fPath := field.NewPath("spec")
+			vols, allErrs := ValidateVolumes(tc.spec.Volumes, nil, fPath.Child("volumes"), opts)
+
+			allErrs = append(allErrs, validateHostUsers(tc.spec, vols, fPath)...)
+			if !tc.success && len(allErrs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if tc.success && len(allErrs) != 0 {
+				t.Errorf("Unexpected error(s): %v", allErrs)
 			}
 		})
 	}
