@@ -791,6 +791,12 @@ const (
 	// Allow users to specify whether to take nodeAffinity/nodeTaint into consideration when
 	// calculating pod topology spread skew.
 	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = "NodeInclusionPolicyInPodTopologySpread"
+
+	// owner: @rata, @giuseppe
+	// kep: http://kep.k8s.io/127
+	//
+	// Enables user namespace support.
+	UserNamespacesSupport featuregate.Feature = "UserNamespacesSupport"
 )
 
 func init() {
@@ -1040,4 +1046,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
+
+	UserNamespacesSupport: {Default: false, PreRelease: featuregate.Alpha},
 }
