@@ -834,6 +834,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
+	klet.usernsManager, err = MakeUserNsManager(klet)
+	if err != nil {
+		return nil, err
+	}
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
 
 	// Finally, put the most recent version of the config on the Kubelet, so
@@ -1172,6 +1176,9 @@ type Kubelet struct {
 
 	// Handles node shutdown events for the Node.
 	shutdownManager nodeshutdown.Manager
+
+	// Manage user namespaces
+	usernsManager *usernsManager
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1876,6 +1883,8 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		}
 		klog.V(4).InfoS("Pod termination removed cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}
+
+	kl.usernsManager.Release(string(pod.UID))
 
 	// mark the final pod status
 	kl.statusManager.TerminatePod(pod)
