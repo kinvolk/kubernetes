@@ -3027,6 +3027,33 @@ func validateInitContainers(containers []core.Container, otherContainers []core.
 	return allErrs
 }
 
+func validateHostUsers(spec *core.PodSpec, volumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		if spec.SecurityContext != nil && spec.SecurityContext.HostUsers != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostUsers"), "field not supported. Enable the feature gate UserNamespacesSupport"))
+		}
+		return allErrs
+	}
+
+	// Only make the following checks if hostUsers is false (otherwise, the container uses the
+	// same userns as the host, and so there isn't anything to check).
+	if spec.SecurityContext == nil || spec.SecurityContext.HostUsers == nil || *spec.SecurityContext.HostUsers == true {
+		return allErrs
+	}
+
+	for name, vol := range volumes {
+		if vol.EmptyDir != nil || vol.Secret != nil || vol.DownwardAPI != nil || vol.ConfigMap != nil ||
+			vol.Projected != nil {
+			continue
+		}
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child(name), "volume type not yet supported in combination with pod.Spec.HostUsers=false"))
+	}
+
+	return allErrs
+}
+
 func validateContainers(containers []core.Container, isInitContainers bool, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -3516,6 +3543,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"))...)
 	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath, opts)...)
+	allErrs = append(allErrs, validateHostUsers(spec, vols, fldPath)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
