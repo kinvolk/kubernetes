@@ -35,11 +35,13 @@ import (
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -612,6 +614,22 @@ func FsUserFrom(pod *v1.Pod) *int64 {
 		return true
 	})
 	return fsUser
+}
+
+func SetFsUserIfUsernsEnabled(f *FileProjection, fsUser *int64) {
+	// We are adding this function out of extra cautious, to not do this if
+	// the feature flag is not active.
+	// However, this really seems being extra cautious. Given how this is
+	// called, this only changes the owner to the user running in the pod or
+	// to the user running in the container if all containers in the pod
+	// have the same RunAsUser (see FsUserFrom(), callers use as param the
+	// result of FsUserFrom()).
+	// Making the owner be yourself in these select cases shouldn't cause
+	// any issues. But for extra safety, we are adding
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return
+	}
+	f.FsUser = fsUser
 }
 
 // HasMountRefs checks if the given mountPath has mountRefs.

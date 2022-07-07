@@ -21,18 +21,23 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -188,6 +193,74 @@ func TestDownwardAPI(t *testing.T) {
 			step.run(test)
 		}
 		test.tearDown()
+	}
+}
+
+// TestDownwardAPICollectDataFsUser tests as much as possible, without running
+// with privileges, that CollectData() does what is expected regarding FsUser.
+// We test FsUser like this, because extending TestDownwardAPI() to create the
+// files with a different user needs privileges (to chown it to a differet user)
+// and we run without privileges in the CI.
+func TestDownwardAPICollectDataFsUser(t *testing.T) {
+	fsUser := int64(100)
+	mode := int32(0644)
+	cases := []struct {
+		name           string
+		featureEnabled bool
+		FsUser         *int64
+		success        bool
+		item           v1.DownwardAPIVolumeFile
+		expProj        map[string]volumeutil.FileProjection
+	}{
+		{
+			name:           "basic UserNamespacesSupport enabled",
+			featureEnabled: true,
+			FsUser:         &fsUser,
+			success:        true,
+			item: v1.DownwardAPIVolumeFile{
+				Path: "test",
+			},
+			expProj: map[string]volumeutil.FileProjection{
+				"test": {
+					FsUser: &fsUser,
+					Mode:   mode,
+				},
+			},
+		},
+		{
+			name:           "basic UserNamespacesSupport disabled",
+			featureEnabled: false,
+			FsUser:         &fsUser,
+			success:        true,
+			item: v1.DownwardAPIVolumeFile{
+				Path: "test",
+			},
+			expProj: map[string]volumeutil.FileProjection{
+				"test": {
+					Mode: mode,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, tc.featureEnabled)()
+			vol := volumetest.NewFakeVolumeHost(t, "/tmp/non-existent-dir/", nil, nil)
+			items := []v1.DownwardAPIVolumeFile{tc.item}
+
+			proj, err := CollectData(items, nil, vol, &mode, tc.FsUser)
+
+			if tc.success && err != nil {
+				t.Errorf("Expected success, but got error: %v", err)
+			}
+			if !tc.success && err == nil {
+				t.Error("Expected error, but got success")
+			}
+			if !reflect.DeepEqual(proj, tc.expProj) {
+				t.Errorf("Expected and actual projection do not match. Expected: %+v - Got: %+v", tc.expProj, proj)
+			}
+		})
 	}
 }
 

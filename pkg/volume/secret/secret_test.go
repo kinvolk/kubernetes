@@ -29,8 +29,11 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -40,12 +43,15 @@ import (
 )
 
 func TestMakePayload(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, true)()
 	caseMappingMode := int32(0400)
+	fsUser := int64(100)
 	cases := []struct {
 		name     string
 		mappings []v1.KeyToPath
 		secret   *v1.Secret
 		mode     int32
+		fsUser   *int64
 		optional bool
 		payload  map[string]util.FileProjection
 		success  bool
@@ -220,6 +226,46 @@ func TestMakePayload(t *testing.T) {
 			success: true,
 		},
 		{
+			name: "mapping with fsUser ",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+				},
+				{
+					Key:  "bar",
+					Path: "bar.bin",
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			fsUser: &fsUser,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), FsUser: &fsUser},
+				"bar.bin": {Data: []byte("bar"), FsUser: &fsUser},
+			},
+			success: true,
+		},
+		{
+			name: "no overrides with fsUser",
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			fsUser: &fsUser,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), FsUser: &fsUser},
+				"bar": {Data: []byte("bar"), FsUser: &fsUser},
+			},
+			success: true,
+		},
+		{
 			name: "optional non existent key",
 			mappings: []v1.KeyToPath{
 				{
@@ -241,7 +287,7 @@ func TestMakePayload(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		actualPayload, err := MakePayload(tc.mappings, tc.secret, &tc.mode, tc.optional)
+		actualPayload, err := MakePayload(tc.mappings, tc.secret, &tc.mode, tc.fsUser, tc.optional)
 		if err != nil && tc.success {
 			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 			continue

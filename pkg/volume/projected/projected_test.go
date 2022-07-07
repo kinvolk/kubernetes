@@ -32,11 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clitesting "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgauthenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	pkgcorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -46,14 +49,17 @@ import (
 
 func TestCollectDataWithSecret(t *testing.T) {
 	caseMappingMode := int32(0400)
+	caseFsUser := int64(100)
 	cases := []struct {
-		name     string
-		mappings []v1.KeyToPath
-		secret   *v1.Secret
-		mode     int32
-		optional bool
-		payload  map[string]util.FileProjection
-		success  bool
+		name           string
+		mappings       []v1.KeyToPath
+		secret         *v1.Secret
+		mode           int32
+		fsUser         *int64
+		optional       bool
+		payload        map[string]util.FileProjection
+		featureEnabled bool
+		success        bool
 	}{
 		{
 			name: "no overrides",
@@ -225,6 +231,45 @@ func TestCollectDataWithSecret(t *testing.T) {
 			success: true,
 		},
 		{
+			name: "no overrides with FsUser",
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode:   0644,
+			fsUser: &caseFsUser,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644, FsUser: &caseFsUser},
+				"bar": {Data: []byte("bar"), Mode: 0644, FsUser: &caseFsUser},
+			},
+			featureEnabled: true,
+			success:        true,
+		},
+		{
+			name: "basic 1 with FsUser",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "path/to/foo.txt",
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode:   0644,
+			fsUser: &caseFsUser,
+			payload: map[string]util.FileProjection{
+				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseFsUser},
+			},
+			featureEnabled: true,
+			success:        true,
+		},
+		{
 			name: "optional non existent key",
 			mappings: []v1.KeyToPath{
 				{
@@ -247,7 +292,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, tc.featureEnabled)()
 			testNamespace := "test_projected_namespace"
 			tc.secret.ObjectMeta = metav1.ObjectMeta{
 				Namespace: testNamespace,
@@ -276,7 +321,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 				pod:    pod,
 			}
 
-			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser})
 			if err != nil && tc.success {
 				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 				return
@@ -297,14 +342,17 @@ func TestCollectDataWithSecret(t *testing.T) {
 
 func TestCollectDataWithConfigMap(t *testing.T) {
 	caseMappingMode := int32(0400)
+	caseFsUser := int64(100)
 	cases := []struct {
-		name      string
-		mappings  []v1.KeyToPath
-		configMap *v1.ConfigMap
-		mode      int32
-		optional  bool
-		payload   map[string]util.FileProjection
-		success   bool
+		name           string
+		mappings       []v1.KeyToPath
+		configMap      *v1.ConfigMap
+		mode           int32
+		fsUser         *int64
+		optional       bool
+		payload        map[string]util.FileProjection
+		success        bool
+		featureEnabled bool
 	}{
 		{
 			name: "no overrides",
@@ -476,6 +524,45 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 			success: true,
 		},
 		{
+			name: "no overrides with FsUser",
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+			},
+			mode:   0644,
+			fsUser: &caseFsUser,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644, FsUser: &caseFsUser},
+				"bar": {Data: []byte("bar"), Mode: 0644, FsUser: &caseFsUser},
+			},
+			success:        true,
+			featureEnabled: true,
+		},
+		{
+			name: "basic 1 with FsUser",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "path/to/foo.txt",
+				},
+			},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+			},
+			mode:   0644,
+			fsUser: &caseFsUser,
+			payload: map[string]util.FileProjection{
+				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseFsUser},
+			},
+			success:        true,
+			featureEnabled: true,
+		},
+		{
 			name: "optional non existent key",
 			mappings: []v1.KeyToPath{
 				{
@@ -497,6 +584,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, tc.featureEnabled)()
 			testNamespace := "test_projected_namespace"
 			tc.configMap.ObjectMeta = metav1.ObjectMeta{
 				Namespace: testNamespace,
@@ -525,7 +613,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				pod:    pod,
 			}
 
-			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: &caseFsUser})
 			if err != nil && tc.success {
 				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 				return
@@ -548,14 +636,17 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 	testNamespace := "test_projected_namespace"
 	testPodUID := types.UID("test_pod_uid")
 	testPodName := "podName"
+	testFsUser := int64(100)
 
 	cases := []struct {
-		name       string
-		volumeFile []v1.DownwardAPIVolumeFile
-		pod        *v1.Pod
-		mode       int32
-		payload    map[string]util.FileProjection
-		success    bool
+		name           string
+		volumeFile     []v1.DownwardAPIVolumeFile
+		pod            *v1.Pod
+		mode           int32
+		fsUser         *int64
+		payload        map[string]util.FileProjection
+		success        bool
+		featureEnabled bool
 	}{
 		{
 			name: "annotation",
@@ -673,10 +764,34 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			},
 			success: true,
 		},
+		{
+			name: "annotation",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['a1']"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						"a1": "value1",
+						"a2": "value2",
+					},
+					UID: testPodUID},
+			},
+			mode:   0644,
+			fsUser: &testFsUser,
+			payload: map[string]util.FileProjection{
+				"annotation": {Data: []byte("value1"), Mode: 0644, FsUser: &testFsUser},
+			},
+			success:        true,
+			featureEnabled: true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, tc.featureEnabled)()
 			source := makeProjection("", utilptr.Int32Ptr(tc.mode), "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
@@ -695,7 +810,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 				pod:    tc.pod,
 			}
 
-			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser})
 			if err != nil && tc.success {
 				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 				return
