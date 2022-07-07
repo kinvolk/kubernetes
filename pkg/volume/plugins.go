@@ -374,6 +374,15 @@ type VolumeHost interface {
 	// information is stored
 	GetPodsDir() string
 
+	// GetHostIDsForPod if the pod uses user namespaces, takes the uid and
+	// gid inside the container and returns the host UID and GID those are
+	// mapped to on the host. If containerUID is nil, then it returns the
+	// host UID for UID 0 inside the container. If containerGID is nil, then
+	// it returns nil.
+	// If the pod is not using user namespaces, as there is no mapping needed, the
+	// same containerUID and containerGID params are returned.
+	GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error)
+
 	// GetPodVolumeDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
 	// pod.  If the specified pod does not exist, the result of this call
