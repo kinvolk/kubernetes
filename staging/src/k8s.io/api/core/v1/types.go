@@ -3286,6 +3286,7 @@ type PodSpec struct {
 	// If the OS field is set to windows, following fields must be unset:
 	// - spec.hostPID
 	// - spec.hostIPC
+	// - spec.hostUsers
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
 	// - spec.securityContext.fsGroup
@@ -3306,6 +3307,11 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
+	// Use the host's user namespace.
+	// Optional: Default to true.
+	// +k8s:conversion-gen=false
+	// +optional
+	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
 }
 
 // OSName is the set of OS'es that can be used in OS.

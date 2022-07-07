@@ -25,7 +25,7 @@ import (
 )
 
 /*
-Sharing the host namespaces must be disallowed.
+Sharing the host namespaces must be disallowed.  The only exception is the user namespace as it is optional for now.
 
 **Restricted Fields:**
 
@@ -33,7 +33,10 @@ spec.hostNetwork
 spec.hostPID
 spec.hostIPC
 
-**Allowed Values:** undefined, false
+**Allowed Values:**
+
+spec.hostUsers
+
 */
 
 func init() {

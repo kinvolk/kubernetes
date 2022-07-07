@@ -2973,6 +2973,7 @@ type PodSpec struct {
 	// If the OS field is set to windows, following fields must be unset:
 	// - spec.hostPID
 	// - spec.hostIPC
+	// - spec.hostUsers
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
 	// - spec.securityContext.fsGroup
@@ -3075,6 +3076,12 @@ type PodSecurityContext struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	ShareProcessNamespace *bool
+	// Use the host's user namespace.
+	// Optional: Default to true.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +k8s:conversion-gen=false
+	// +optional
+	HostUsers *bool
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in
