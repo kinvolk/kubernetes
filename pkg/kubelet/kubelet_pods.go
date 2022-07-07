@@ -1170,6 +1170,12 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		klog.ErrorS(err, "Failed cleaning up orphaned pod directories")
 	}
 
+	// Remove orphaned pod user namespace allocations (if any).
+	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
+	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(allPods, runningRuntimePods); err != nil {
+		klog.ErrorS(err, "Failed cleaning up orphaned pod user namespaces allocations")
+	}
+
 	// Remove any orphaned mirror pods (mirror pods are tracked by name via the
 	// pod worker)
 	klog.V(3).InfoS("Clean up orphaned mirror pods")
