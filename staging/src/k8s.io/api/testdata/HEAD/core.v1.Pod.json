@@ -1564,7 +1564,8 @@
     "setHostnameAsFQDN": true,
     "os": {
       "name": "nameValue"
-    }
+    },
+    "hostUsers": true
   },
   "status": {
     "phase": "phaseValue",
