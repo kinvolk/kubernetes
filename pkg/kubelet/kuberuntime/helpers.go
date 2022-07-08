@@ -354,10 +354,10 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
+func (m *kubeGenericRuntimeManager) namespacesForPod(pod *v1.Pod) (*runtimeapi.NamespaceOption, error) {
 	return &runtimeapi.NamespaceOption{
 		Ipc:     ipcNamespaceForPod(pod),
 		Network: networkNamespaceForPod(pod),
 		Pid:     pidNamespaceForPod(pod),
-	}
+	}, nil
 }

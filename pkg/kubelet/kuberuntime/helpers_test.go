@@ -921,6 +921,9 @@ func getLocal(v string) *string {
 }
 
 func TestNamespacesForPod(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
 	for desc, test := range map[string]struct {
 		input    *v1.Pod
 		expected *runtimeapi.NamespaceOption
@@ -981,7 +984,8 @@ func TestNamespacesForPod(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase: %s", desc)
-		actual := namespacesForPod(test.input)
+		actual, err := m.namespacesForPod(test.input)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expected, actual)
 	}
 }
