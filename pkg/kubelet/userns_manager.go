@@ -29,6 +29,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 // bitsDataElement is the number of bits in a bitArray.data element.
@@ -154,6 +156,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 // recordPodMappings registers the range used for the user namespace if the
 // usernsConfFile exists in the pod directory.
 func (m *usernsManager) recordPodMappings(pod types.UID) error {
+	// XXX: rata. We should replace this with filestore Read
 	content, err := os.ReadFile(m.getUserNamespaceMappingsFile(pod))
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -320,7 +323,31 @@ func (m *usernsManager) createUserNs(pod *v1.Pod, usernsConfFile string) (userNs
 		return
 	}
 
-	if err = os.WriteFile(usernsConfFile, []byte(annotation), 0640); err != nil {
+	// XXX: rata. TODO: we can create it on userns creation on
+	// m.kl.GetPodsDir() and use pod/userns as key. But... doing it here is
+	// also fine, maybe?
+	fstore, err := utilstore.NewFileStore(m.kl.getPodDir(pod.UID), &utilfs.DefaultFs{})
+	if err != nil {
+		return
+	}
+
+	if err = fstore.Write("userns", []byte(annotation)); err != nil {
+		return
+	}
+
+	// We need to fsync the parent dir so the file is guaranteed to be there.
+	// fstore guarantees and atomic write, we need durability too.
+	parentDir, err := os.Open(m.kl.getPodDir(pod.UID))
+	if err != nil {
+		return
+	}
+
+	if err = parentDir.Sync(); err != nil {
+		// Ignore return here, there is already an error reported.
+		parentDir.Close()
+		return
+	}
+	if err = parentDir.Close(); err != nil {
 		return
 	}
 
@@ -344,6 +371,7 @@ func (m *usernsManager) GetUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserN
 
 	usernsConfFile := m.getUserNamespaceMappingsFile(pod.UID)
 
+	// XXX: rata. We should replace this with filestore Read
 	content, err := os.ReadFile(usernsConfFile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
