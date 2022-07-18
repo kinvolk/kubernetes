@@ -121,6 +121,53 @@ type idMapping struct {
 	Length uint32 `json:"length"`
 }
 
+// mappingsFile is the file where the user namespace mappings are persisted.
+const mappingsFile = "userns"
+
+// writeMappingsToFile writes the specified user namespace configuration to the pod
+// directory.
+func (m *usernsManager) writeMappingsToFile(pod types.UID, userNs userNamespace) error {
+	dir := m.kl.getPodDir(pod)
+
+	data, err := json.Marshal(userNs)
+	if err != nil {
+		return err
+	}
+
+	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
+	if err != nil {
+		return err
+	}
+	if err := fstore.Write(mappingsFile, data); err != nil {
+		return err
+	}
+
+	// We need to fsync the parent dir so the file is guaranteed to be there.
+	// fstore guarantees an atomic write, we need durability too.
+	parentDir, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+
+	if err = parentDir.Sync(); err != nil {
+		// Ignore return here, there is already an error reported.
+		parentDir.Close()
+		return err
+	}
+
+	return parentDir.Close()
+}
+
+// readMappingsFromFile reads the user namespace configuration from the pod directory.
+func (m *usernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
+	dir := m.kl.getPodDir(pod)
+	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
+	if err != nil {
+		return nil, err
+	}
+	return fstore.Read(mappingsFile)
+}
+
 func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 	m := usernsManager{
 		// Create a bitArray for all the UID space (2^32).
@@ -156,9 +203,8 @@ func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 // recordPodMappings registers the range used for the user namespace if the
 // usernsConfFile exists in the pod directory.
 func (m *usernsManager) recordPodMappings(pod types.UID) error {
-	// XXX: rata. We should replace this with filestore Read
-	content, err := os.ReadFile(m.getUserNamespaceMappingsFile(pod))
-	if err != nil && !os.IsNotExist(err) {
+	content, err := m.readMappingsFromFile(pod)
+	if err != nil && err != utilstore.ErrKeyNotFound {
 		return err
 	}
 	if string(content) == "" {
@@ -166,11 +212,7 @@ func (m *usernsManager) recordPodMappings(pod types.UID) error {
 	}
 
 	_, err = m.parseUserNsFileAndRecord(pod, content)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // getUserNamespaceMappingsFile returns the path to the file that contains the user
@@ -289,7 +331,7 @@ func (m *usernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) 
 	return
 }
 
-func (m *usernsManager) createUserNs(pod *v1.Pod, usernsConfFile string) (userNs userNamespace, err error) {
+func (m *usernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err error) {
 	firstID, length, err := m.allocateOne(string(pod.UID))
 	if err != nil {
 		return
@@ -318,40 +360,7 @@ func (m *usernsManager) createUserNs(pod *v1.Pod, usernsConfFile string) (userNs
 		},
 	}
 
-	annotation, err := json.Marshal(userNs)
-	if err != nil {
-		return
-	}
-
-	// XXX: rata. TODO: we can create it on userns creation on
-	// m.kl.GetPodsDir() and use pod/userns as key. But... doing it here is
-	// also fine, maybe?
-	fstore, err := utilstore.NewFileStore(m.kl.getPodDir(pod.UID), &utilfs.DefaultFs{})
-	if err != nil {
-		return
-	}
-
-	if err = fstore.Write("userns", []byte(annotation)); err != nil {
-		return
-	}
-
-	// We need to fsync the parent dir so the file is guaranteed to be there.
-	// fstore guarantees and atomic write, we need durability too.
-	parentDir, err := os.Open(m.kl.getPodDir(pod.UID))
-	if err != nil {
-		return
-	}
-
-	if err = parentDir.Sync(); err != nil {
-		// Ignore return here, there is already an error reported.
-		parentDir.Close()
-		return
-	}
-	if err = parentDir.Close(); err != nil {
-		return
-	}
-
-	return
+	return userNs, m.writeMappingsToFile(pod.UID, userNs)
 }
 
 // GetUserNamespaceMappings returns the configuration for the sandbox user namespace
@@ -369,11 +378,8 @@ func (m *usernsManager) GetUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserN
 		}, nil
 	}
 
-	usernsConfFile := m.getUserNamespaceMappingsFile(pod.UID)
-
-	// XXX: rata. We should replace this with filestore Read
-	content, err := os.ReadFile(usernsConfFile)
-	if err != nil && !os.IsNotExist(err) {
+	content, err := m.readMappingsFromFile(pod.UID)
+	if err != nil && err != utilstore.ErrKeyNotFound {
 		return nil, err
 	}
 
@@ -384,7 +390,7 @@ func (m *usernsManager) GetUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserN
 			return nil, err
 		}
 	} else {
-		userNs, err = m.createUserNs(pod, usernsConfFile)
+		userNs, err = m.createUserNs(pod)
 		if err != nil {
 			return nil, err
 		}
