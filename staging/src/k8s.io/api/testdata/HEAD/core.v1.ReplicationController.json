@@ -1613,7 +1613,8 @@
         "setHostnameAsFQDN": true,
         "os": {
           "name": "nameValue"
-        }
+        },
+        "hostUsers": true
       }
     }
   },

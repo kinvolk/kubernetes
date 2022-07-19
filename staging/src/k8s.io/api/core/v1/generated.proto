@@ -3709,6 +3709,7 @@ message PodSpec {
   // If the OS field is set to windows, following fields must be unset:
   // - spec.hostPID
   // - spec.hostIPC
+  // - spec.hostUsers
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
   // - spec.securityContext.fsGroup
@@ -3729,6 +3730,12 @@ message PodSpec {
   // - spec.containers[*].securityContext.runAsGroup
   // +optional
   optional PodOS os = 36;
+
+  // Use the host's user namespace.
+  // Optional: Default to true.
+  // +k8s:conversion-gen=false
+  // +optional
+  optional bool hostUsers = 37;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
