@@ -19,14 +19,18 @@ package kubelet
 import (
 	"bytes"
 	"context"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
@@ -76,7 +80,74 @@ const (
 const (
 	PodInitializing   = "PodInitializing"
 	ContainerCreating = "ContainerCreating"
+
+	kubeletUser = "kubelet"
 )
+
+func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
+	lines := strings.Split(strings.Trim(input, "\n"), "\n")
+	if len(lines) != 1 {
+		return 0, 0, fmt.Errorf("error parsing line %q: it must contain only one line", input)
+	}
+
+	parts := strings.Fields(lines[0])
+	if len(parts) != 4 {
+		return 0, 0, fmt.Errorf("invalid line %q", input)
+	}
+
+	// Parsing the numbers
+	num1, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	num2, err := strconv.ParseUint(parts[3], 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	return uint32(num1), uint32(num2), nil
+}
+
+// Get the additional IDs allocated for the Kubelet.
+func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
+	// default mappings to return if there is no specific configuration
+	const defaultFirstID = 1 << 16
+	const defaultLen = 1<<32 - defaultFirstID
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return defaultFirstID, defaultLen, nil
+	}
+
+	_, err := user.Lookup(kubeletUser)
+	if err != nil {
+		var unknownUserErr user.UnknownUserError
+		if goerrors.As(err, &unknownUserErr) {
+			// if the user is not found, we assume that the user is not configured
+			return defaultFirstID, defaultLen, nil
+		}
+		return 0, 0, err
+	}
+	cmd, err := exec.LookPath("getsubids")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return defaultFirstID, defaultLen, nil
+		}
+		return 0, 0, err
+	}
+	outUids, err := exec.Command(cmd, kubeletUser).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("error retrieving additional ids for user %q", kubeletUser)
+	}
+	outGids, err := exec.Command(cmd, "-g", kubeletUser).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("error retrieving additional gids for user %q", kubeletUser)
+	}
+	if string(outUids) != string(outGids) {
+		return 0, 0, fmt.Errorf("mismatched subuids and subgids for user %q", kubeletUser)
+	}
+	return parseGetSubIdsOutput(string(outUids))
+}
 
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
