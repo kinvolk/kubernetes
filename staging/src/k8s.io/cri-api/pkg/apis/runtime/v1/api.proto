@@ -1528,6 +1528,19 @@ message StatusRequest {
     bool verbose = 1;
 }
 
+message RuntimeHandlerFeatures {
+    // user_namespaces is set to true if the runtime handler supports user namespaces.
+    bool user_namespaces = 1;
+}
+
+message RuntimeHandler {
+    // Name must be unique in StatusResponse.
+    // An empty string denotes the default handler.
+    string name = 1;
+    // Supported features.
+    RuntimeHandlerFeatures features = 2;
+}
+
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
@@ -1536,6 +1549,8 @@ message StatusResponse {
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+    // Runtime handlers.
+    repeated RuntimeHandler runtime_handlers = 3;
 }
 
 message ImageFsInfoRequest {}
