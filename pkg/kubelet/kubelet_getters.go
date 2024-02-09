@@ -109,6 +109,22 @@ func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
 	return kl.listPodsFromDisk()
 }
 
+// HandlerSupportsUserNamespaces checks whether the specified handler supports
+// user namespaces.
+func (kl *Kubelet) HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error) {
+	kl.updateRuntimeMux.Lock()
+	defer kl.updateRuntimeMux.Unlock()
+
+	if kl.runtimeHandlers == nil {
+		return false, fmt.Errorf("runtime handlers are not set")
+	}
+	h, found := kl.runtimeHandlers[runtimeHandler]
+	if !found {
+		return false, fmt.Errorf("the handler %q is not known", runtimeHandler)
+	}
+	return h.SupportsUserNamespaces, nil
+}
+
 // getPodDir returns the full path to the per-pod directory for the pod with
 // the given UID.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
