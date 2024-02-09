@@ -1088,6 +1088,9 @@ type Kubelet struct {
 	// Mutex is used to protect this value.
 	runtimeState *runtimeState
 
+	// runtimeHandlers is a map of the handlers as reported by the runtime
+	runtimeHandlers map[string]kubecontainer.RuntimeHandler
+
 	// Volume plugins.
 	volumePluginMgr *volume.VolumePluginMgr
 
@@ -2893,6 +2896,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 		kl.runtimeState.setRuntimeState(fmt.Errorf("container runtime not ready: %v", runtimeReady))
 		return
 	}
+	kl.runtimeHandlers = s.Handlers
 	kl.runtimeState.setRuntimeState(nil)
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
