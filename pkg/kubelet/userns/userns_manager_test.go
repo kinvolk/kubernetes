@@ -17,6 +17,7 @@ limitations under the License.
 package userns
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -35,6 +36,7 @@ import (
 type testUserNsPodsManager struct {
 	podDir  string
 	podList []types.UID
+	userns  bool
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
@@ -52,7 +54,10 @@ func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 }
 
 func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error) {
-	return true, nil
+	if runtimeHandler == "error" {
+		return false, errors.New("unknown runtime")
+	}
+	return m.userns, nil
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
@@ -195,14 +200,22 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 	falseVal := false
 
 	cases := []struct {
-		name    string
-		pod     *v1.Pod
-		expMode runtimeapi.NamespaceMode
-		success bool
+		name           string
+		pod            *v1.Pod
+		expMode        runtimeapi.NamespaceMode
+		runtimeUserns  bool
+		runtimeHandler string
+		success        bool
 	}{
 		{
 			name:    "no user namespace",
 			pod:     &v1.Pod{},
+			expMode: runtimeapi.NamespaceMode_NODE,
+			success: true,
+		},
+		{
+			name:    "nil pod",
+			pod:     nil,
 			expMode: runtimeapi.NamespaceMode_NODE,
 			success: true,
 		},
@@ -223,19 +236,42 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 					HostUsers: &falseVal,
 				},
 			},
-			expMode: runtimeapi.NamespaceMode_POD,
-			success: true,
+			expMode:       runtimeapi.NamespaceMode_POD,
+			runtimeUserns: true,
+			success:       true,
+		},
+		{
+			name: "user namespace, but no runtime support",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
+			runtimeUserns: false,
+		},
+		{
+			name: "user namespace, but runtime returns error",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
+			// This handler name makes the fake runtime return an error.
+			runtimeHandler: "error",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// These tests will create the userns file, so use an existing podDir.
-			testUserNsPodsManager := &testUserNsPodsManager{podDir: t.TempDir()}
+			testUserNsPodsManager := &testUserNsPodsManager{
+				podDir: t.TempDir(),
+				userns: tc.runtimeUserns,
+			}
 			m, err := MakeUserNsManager(testUserNsPodsManager)
 			assert.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod, "")
+			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod, tc.runtimeHandler)
 			if (tc.success && err != nil) || (!tc.success && err == nil) {
 				t.Errorf("expected success: %v but got error: %v", tc.success, err)
 			}
